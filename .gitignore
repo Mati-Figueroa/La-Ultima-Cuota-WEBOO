@@ -1,0 +1,23 @@
+# Build
+backend/target/
+*.class
+*.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+
+# Node
+frontend/node_modules/
+frontend/.env.local
+
+# Docker
+pgdata/
+
+# OS
+.DS_Store
+Thumbs.db
