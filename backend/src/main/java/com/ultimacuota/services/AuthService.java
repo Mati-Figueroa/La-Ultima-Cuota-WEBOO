@@ -2,6 +2,7 @@ package com.ultimacuota.services;
 
 import com.ultimacuota.dto.LoginRequest;
 import com.ultimacuota.dto.RegisterRequest;
+import com.ultimacuota.dto.UpdateProfileRequest;
 import com.ultimacuota.dto.UserResponse;
 import com.ultimacuota.exceptions.ConflictException;
 import com.ultimacuota.exceptions.ResourceNotFoundException;
@@ -13,6 +14,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -73,6 +75,33 @@ public class AuthService {
     public UserResponse me(Long userId) {
         Usuario user = usuarioRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
+        return UserResponse.from(user);
+    }
+
+    public UserResponse updateProfile(Long userId, UpdateProfileRequest request) {
+        Usuario user = usuarioRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
+
+        if (request.getUsername() != null && !request.getUsername().trim().isEmpty()) {
+            String newUsername = request.getUsername().trim();
+            if (newUsername.length() > 50) {
+                throw new IllegalArgumentException("El nombre de usuario no puede exceder 50 caracteres");
+            }
+            if (!newUsername.equals(user.getUsername())) {
+                List<Usuario> existing = usuarioRepository.findByEmailOrUsername(user.getEmail(), newUsername);
+                boolean taken = existing.stream().anyMatch(u -> !u.getId().equals(userId));
+                if (taken) {
+                    throw new ConflictException("El nombre de usuario ya está en uso");
+                }
+                user.setUsername(newUsername);
+            }
+        }
+
+        if (request.getProfilePhoto() != null) {
+            user.setProfilePhoto(request.getProfilePhoto());
+        }
+
+        user = usuarioRepository.save(user);
         return UserResponse.from(user);
     }
 }

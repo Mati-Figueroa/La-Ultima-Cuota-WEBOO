@@ -115,7 +115,7 @@ function Login() {
               <div className="text-center">
                 <span className="text-muted">¿No tienes cuenta? </span>
                 <Link
-                  to="/register"
+                  to="/"
                   className="fw-semibold"
                   style={{ color: 'var(--color-primary)', textDecoration: 'none' }}
                 >

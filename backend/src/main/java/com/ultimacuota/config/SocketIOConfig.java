@@ -1,6 +1,7 @@
 package com.ultimacuota.config;
 
 import com.corundumstudio.socketio.SocketIOServer;
+import com.ultimacuota.scheduler.AuctionScheduler;
 import com.ultimacuota.scheduler.RaceScheduler;
 import com.ultimacuota.services.RaceSimulationService;
 import jakarta.annotation.PreDestroy;
@@ -21,7 +22,7 @@ public class SocketIOConfig {
     private SocketIOServer server;
 
     @Bean
-    public SocketIOServer socketIOServer(RaceScheduler raceScheduler, RaceSimulationService simulationService) {
+    public SocketIOServer socketIOServer(RaceScheduler raceScheduler, RaceSimulationService simulationService, AuctionScheduler auctionScheduler) {
         com.corundumstudio.socketio.Configuration config = new com.corundumstudio.socketio.Configuration();
         config.setPort(port);
         config.setOrigin("http://localhost:3000");
@@ -59,8 +60,21 @@ public class SocketIOConfig {
             client.leaveRoom("race_" + raceIdNum.longValue());
         });
 
+        server.addEventListener("join_auction", Map.class, (client, data, ackSender) -> {
+            Number auctionIdNum = (Number) data.get("subasta_id");
+            if (auctionIdNum == null) return;
+            client.joinRoom("auction_" + auctionIdNum);
+        });
+
+        server.addEventListener("leave_auction", Map.class, (client, data, ackSender) -> {
+            Number auctionIdNum = (Number) data.get("subasta_id");
+            if (auctionIdNum == null) return;
+            client.leaveRoom("auction_" + auctionIdNum);
+        });
+
         server.start();
         raceScheduler.setSocketIOServer(server);
+        auctionScheduler.setSocketIOServer(server);
         log.info("[Socket.IO] Servidor iniciado en puerto {}", port);
 
         return server;

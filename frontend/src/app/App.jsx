@@ -17,6 +17,12 @@ import Stable from '../features/stable/pages/Stable';
 import Market from '../features/market/pages/Market';
 import History from '../features/history/pages/History';
 import Simulador from '../features/races/pages/Simulador';
+import UserProfile from '../features/profile/pages/UserProfile';
+import EditProfile from '../features/profile/pages/EditProfile';
+import HorseDetail from '../features/horses/pages/HorseDetail';
+import AuctionList from '../features/auctions/pages/AuctionList';
+import AuctionDetail from '../features/auctions/pages/AuctionDetail';
+import CreateAuction from '../features/auctions/pages/CreateAuction';
 
 function App() {
   return (
@@ -114,6 +120,66 @@ function App() {
                 <PrivateRoute>
                   <DashboardLayout>
                     <Simulador />
+                  </DashboardLayout>
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/perfil/:id"
+              element={
+                <PrivateRoute>
+                  <DashboardLayout>
+                    <UserProfile />
+                  </DashboardLayout>
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/editar-perfil"
+              element={
+                <PrivateRoute>
+                  <DashboardLayout>
+                    <EditProfile />
+                  </DashboardLayout>
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/caballo/:id"
+              element={
+                <PrivateRoute>
+                  <DashboardLayout>
+                    <HorseDetail />
+                  </DashboardLayout>
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/subastas"
+              element={
+                <PrivateRoute>
+                  <DashboardLayout>
+                    <AuctionList />
+                  </DashboardLayout>
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/subasta/:id"
+              element={
+                <PrivateRoute>
+                  <DashboardLayout>
+                    <AuctionDetail />
+                  </DashboardLayout>
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/subastas/crear"
+              element={
+                <PrivateRoute>
+                  <DashboardLayout>
+                    <CreateAuction />
                   </DashboardLayout>
                 </PrivateRoute>
               }

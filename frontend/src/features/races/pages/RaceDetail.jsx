@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Container, Row, Col, Card, Button, Badge, Form, Alert, ProgressBar } from 'react-bootstrap';
 import { useToast } from '../../../shared/context/ToastContext';
 import { useAuth } from '../../../shared/context/AuthContext';
@@ -259,7 +259,11 @@ function RaceDetail() {
                               </td>
                             )}
                             <td className="font-mono fw-bold">#{insc.numero_carril}</td>
-                            <td className="fw-medium">{insc.caballo_nombre}</td>
+                            <td className="fw-medium">
+                              <Link to={`/caballo/${insc.caballo_id}`} className="text-decoration-none" style={{ color: 'var(--color-text-dark)' }}>
+                                {insc.caballo_nombre}
+                              </Link>
+                            </td>
                             <td className="text-muted">{insc.dueno_username || 'Bot'}</td>
                             <td className="font-mono">{wr}%</td>
                             <td>

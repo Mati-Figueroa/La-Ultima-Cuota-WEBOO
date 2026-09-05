@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { Container, Row, Col, Card, Button, Badge, Modal, Form } from 'react-bootstrap';
 import { useToast } from '../../../shared/context/ToastContext';
 import api from '../../../shared/services/api';
@@ -187,6 +188,13 @@ function Stable() {
                     </div>
 
                     <div className="mt-auto d-flex flex-wrap gap-1">
+                      <Link
+                        to={`/caballo/${horse.id}`}
+                        className="btn btn-outline-primary btn-sm"
+                        style={{ borderRadius: '6px', fontSize: '0.78rem' }}
+                      >
+                        <i className="bi bi-eye me-1"></i>Ver detalle
+                      </Link>
                       <Button
                         variant="outline-primary"
                         size="sm"

@@ -6,6 +6,7 @@ const SIDEBAR_ITEMS = [
   { path: '/dashboard', label: 'Inicio', icon: 'bi-house-door' },
   { path: '/establo', label: 'Establo', icon: 'bi-grid' },
   { path: '/mercado', label: 'Mercado', icon: 'bi-shop' },
+  { path: '/subastas', label: 'Subastas', icon: 'bi-hammer' },
   { path: '/calendario', label: 'Carreras', icon: 'bi-flag' },
   { path: '/gacha', label: 'Gacha', icon: 'bi-dice-5' },
   { path: '/historial', label: 'Historial', icon: 'bi-clock-history' },

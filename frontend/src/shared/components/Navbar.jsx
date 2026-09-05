@@ -3,12 +3,14 @@ import { Navbar, Nav, Container, Badge, Dropdown } from 'react-bootstrap';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import DailyRewardButton from './DailyRewardButton';
+import UserSearch from './UserSearch';
 import api from '../services/api';
 
 const ROUTE_LABELS = {
   '/dashboard': 'Inicio',
   '/establo': 'Establo',
   '/mercado': 'Mercado',
+  '/subastas': 'Subastas',
   '/calendario': 'Carreras',
   '/gacha': 'Gacha',
   '/historial': 'Historial',
@@ -33,7 +35,7 @@ function NavigationBar() {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/');
   };
 
   const crumbs = location.pathname
@@ -99,6 +101,8 @@ function NavigationBar() {
           <Nav className="ms-auto align-items-center gap-2">
             {isAuthenticated && user && (
               <>
+                <UserSearch />
+
                 <span
                   className="font-mono fw-bold px-2 py-1 rounded d-inline-flex align-items-center gap-1"
                   style={{
@@ -152,18 +156,42 @@ function NavigationBar() {
                     variant="outline-light"
                     size="sm"
                     id="user-dropdown"
-                    style={{ borderColor: 'rgba(255,255,255,0.3)' }}
+                    style={{ borderColor: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', gap: '6px' }}
                   >
-                    <i className="bi bi-person-circle me-1"></i>
+                    {user.profilePhoto ? (
+                      <img
+                        src={user.profilePhoto}
+                        alt=""
+                        style={{ width: '22px', height: '22px', borderRadius: '50%', objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <i className="bi bi-person-circle"></i>
+                    )}
                     {user.username}
                   </Dropdown.Toggle>
                   <Dropdown.Menu>
-                    <Dropdown.ItemText className="fw-medium">
-                      {user.username}
+                    <Dropdown.ItemText className="fw-medium d-flex align-items-center gap-2">
+                      {user.profilePhoto ? (
+                        <img
+                          src={user.profilePhoto}
+                          alt=""
+                          style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }}
+                        />
+                      ) : (
+                        <i className="bi bi-person-circle" style={{ fontSize: '1.5rem' }}></i>
+                      )}
+                      <div>
+                        <div className="fw-medium">{user.username}</div>
+                        <div className="text-muted small">{user.email}</div>
+                      </div>
                     </Dropdown.ItemText>
-                    <Dropdown.ItemText className="text-muted small">
-                      {user.email}
-                    </Dropdown.ItemText>
+                    <Dropdown.Divider />
+                    <Dropdown.Item as={Link} to={`/perfil/${user.id}`}>
+                      <i className="bi bi-person me-2"></i>Mi Perfil
+                    </Dropdown.Item>
+                    <Dropdown.Item as={Link} to="/editar-perfil">
+                      <i className="bi bi-pencil me-2"></i>Editar Perfil
+                    </Dropdown.Item>
                     <Dropdown.Divider />
                     <Dropdown.Item onClick={handleLogout}>
                       <i className="bi bi-box-arrow-right me-2"></i>Cerrar Sesión
@@ -174,10 +202,10 @@ function NavigationBar() {
             )}
             {!isAuthenticated && (
               <>
-                <Nav.Link as={Link} to="/login" className="text-light">
+                <Nav.Link as={Link} to="/" className="text-light">
                   Iniciar Sesión
                 </Nav.Link>
-                <Nav.Link as={Link} to="/register" className="text-light">
+                <Nav.Link as={Link} to="/" className="text-light">
                   Registrarse
                 </Nav.Link>
               </>

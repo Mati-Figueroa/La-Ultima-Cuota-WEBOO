@@ -27,4 +27,7 @@ public interface InscripcionRepository extends JpaRepository<Inscripcion, Long> 
 
     @Query("SELECT COALESCE(MAX(i.numeroCarril), 0) + 1 FROM Inscripcion i WHERE i.carrera.id = :carreraId")
     int findNextLane(@Param("carreraId") Long carreraId);
+
+    @Query("SELECT COUNT(i) > 0 FROM Inscripcion i WHERE i.caballo.id = :caballoId AND i.carrera.estado <> 'finalizada'")
+    boolean isInscribedInActiveRace(@Param("caballoId") Long caballoId);
 }

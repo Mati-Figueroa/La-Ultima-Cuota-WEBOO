@@ -153,7 +153,7 @@ function Register() {
               <div className="text-center">
                 <span className="text-muted">¿Ya tienes cuenta? </span>
                 <Link
-                  to="/login"
+                  to="/"
                   className="fw-semibold"
                   style={{ color: 'var(--color-primary)', textDecoration: 'none' }}
                 >

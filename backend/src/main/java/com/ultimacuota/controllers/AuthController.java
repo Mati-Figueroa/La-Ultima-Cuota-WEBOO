@@ -32,4 +32,12 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.ok(
                 java.util.Map.of("user", authService.me(user.getId()))));
     }
+
+    @PatchMapping("/me")
+    public ResponseEntity<ApiResponse<Object>> updateProfile(
+            @RequestBody UpdateProfileRequest request,
+            @AuthenticationPrincipal CustomUserDetails user) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                java.util.Map.of("user", authService.updateProfile(user.getId(), request))));
+    }
 }

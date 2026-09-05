@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { Container, Row, Col, Card, Button, Form, InputGroup, Modal } from 'react-bootstrap';
 import { useToast } from '../../../shared/context/ToastContext';
 import { useAuth } from '../../../shared/context/AuthContext';
@@ -142,7 +143,9 @@ function Market() {
                 <Card className="h-100 border-0 shadow-sm">
                   <Card.Body className="d-flex flex-column">
                     <h5 className="font-heading fw-bold mb-1" style={{ color: 'var(--color-text-dark)' }}>
-                      {horse.nombre}
+                      <Link to={`/caballo/${horse.id}`} className="text-decoration-none" style={{ color: 'inherit' }}>
+                        {horse.nombre}
+                      </Link>
                     </h5>
                     <p className="text-muted mb-2" style={{ fontSize: '0.85rem' }}>
                       Vendedor: <span className="fw-medium">{horse.dueno_username}</span>

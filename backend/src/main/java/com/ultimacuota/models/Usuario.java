@@ -33,6 +33,9 @@ public class Usuario {
     @Column(name = "ultima_recompensa_diaria")
     private LocalDateTime ultimaRecompensaDiaria;
 
+    @Column(name = "profile_photo", columnDefinition = "TEXT")
+    private String profilePhoto;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

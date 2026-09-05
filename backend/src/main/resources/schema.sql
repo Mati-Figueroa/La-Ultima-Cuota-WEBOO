@@ -5,10 +5,14 @@ CREATE TABLE IF NOT EXISTS usuarios (
     email VARCHAR(100) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     saldo NUMERIC(12,2) DEFAULT 1000.00,
+    profile_photo TEXT NULL,
     ultima_recompensa_diaria TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
+
+-- Idempotent column addition for profile_photo (safe if column already exists)
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS profile_photo TEXT NULL;
 
 CREATE TABLE IF NOT EXISTS caballos (
     id SERIAL PRIMARY KEY,
@@ -92,4 +96,32 @@ CREATE TABLE IF NOT EXISTS transacciones_saldo (
     referencia_tabla VARCHAR(50) NULL,
     referencia_id INTEGER NULL,
     created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- =============================================
+-- NEW TABLES: Subastas (Auctions) + Pujas (Bids)
+-- =============================================
+
+CREATE TABLE IF NOT EXISTS subastas (
+    id SERIAL PRIMARY KEY,
+    caballo_id INTEGER NOT NULL REFERENCES caballos(id) ON DELETE CASCADE,
+    vendedor_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    precio_inicial NUMERIC(12,2) NOT NULL,
+    precio_reserva NUMERIC(12,2) NULL,
+    fecha_inicio TIMESTAMP NOT NULL DEFAULT NOW(),
+    fecha_fin TIMESTAMP NOT NULL,
+    estado VARCHAR(20) DEFAULT 'activa' CHECK (estado IN ('activa', 'finalizada', 'cancelada')),
+    ganador_id INTEGER NULL REFERENCES usuarios(id) ON DELETE SET NULL,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS pujas (
+    id SERIAL PRIMARY KEY,
+    subasta_id INTEGER NOT NULL REFERENCES subastas(id) ON DELETE CASCADE,
+    usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    monto NUMERIC(12,2) NOT NULL,
+    fecha TIMESTAMP DEFAULT NOW(),
+    es_ganadora BOOLEAN DEFAULT FALSE,
+    UNIQUE (subasta_id, usuario_id)
 );

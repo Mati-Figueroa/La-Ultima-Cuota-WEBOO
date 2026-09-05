@@ -15,9 +15,10 @@ public class UserResponse {
     private String username;
     private String email;
     private BigDecimal saldo;
+    private String profilePhoto;
     private LocalDateTime createdAt;
 
     public static UserResponse from(com.ultimacuota.models.Usuario u) {
-        return new UserResponse(u.getId(), u.getUsername(), u.getEmail(), u.getSaldo(), u.getCreatedAt());
+        return new UserResponse(u.getId(), u.getUsername(), u.getEmail(), u.getSaldo(), u.getProfilePhoto(), u.getCreatedAt());
     }
 }
