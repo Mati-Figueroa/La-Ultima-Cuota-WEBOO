@@ -232,7 +232,7 @@ public class AuctionService {
 
         TransaccionSaldo bidTx = TransaccionSaldo.builder()
                 .usuario(bidder)
-                .tipo("apuesta_realizada")
+                .tipo("puja_subasta")
                 .monto(request.getMonto().negate())
                 .saldoResultante(bidder.getSaldo())
                 .referenciaTabla("subastas")

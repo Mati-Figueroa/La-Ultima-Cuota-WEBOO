@@ -6,6 +6,7 @@ import com.ultimacuota.dto.UpdateProfileRequest;
 import com.ultimacuota.dto.UserResponse;
 import com.ultimacuota.exceptions.ConflictException;
 import com.ultimacuota.exceptions.ResourceNotFoundException;
+import com.ultimacuota.exceptions.UnauthorizedException;
 import com.ultimacuota.models.Usuario;
 import com.ultimacuota.repositories.UsuarioRepository;
 import com.ultimacuota.security.JwtTokenProvider;
@@ -58,10 +59,10 @@ public class AuthService {
         }
 
         Usuario user = usuarioRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new ResourceNotFoundException("Credenciales inválidas"));
+                .orElseThrow(() -> new UnauthorizedException("Credenciales inválidas"));
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            throw new ResourceNotFoundException("Credenciales inválidas");
+            throw new UnauthorizedException("Credenciales inválidas");
         }
 
         String token = jwtTokenProvider.generateToken(user.getId(), user.getUsername(), user.getEmail());

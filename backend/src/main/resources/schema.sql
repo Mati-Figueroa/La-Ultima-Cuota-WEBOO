@@ -90,7 +90,7 @@ CREATE TABLE IF NOT EXISTS configuracion (
 CREATE TABLE IF NOT EXISTS transacciones_saldo (
     id SERIAL PRIMARY KEY,
     usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
-    tipo VARCHAR(30) NOT NULL CHECK (tipo IN ('compra_caballo', 'venta_caballo', 'apuesta_realizada', 'apuesta_ganada', 'moneda_diaria', 'ajuste_admin', 'comision_dueno')),
+    tipo VARCHAR(30) NOT NULL CHECK (tipo IN ('compra_caballo', 'venta_caballo', 'apuesta_realizada', 'apuesta_ganada', 'moneda_diaria', 'ajuste_admin', 'comision_dueno', 'puja_subasta')),
     monto NUMERIC(12,2) NOT NULL,
     saldo_resultante NUMERIC(12,2) NOT NULL,
     referencia_tabla VARCHAR(50) NULL,

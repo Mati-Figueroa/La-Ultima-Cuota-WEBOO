@@ -2,7 +2,7 @@ package com.ultimacuota.config;
 
 import com.corundumstudio.socketio.SocketIOServer;
 import com.ultimacuota.scheduler.AuctionScheduler;
-import com.ultimacuota.scheduler.RaceScheduler;
+import com.ultimacuota.scheduler.RaceLifecycleManager;
 import com.ultimacuota.services.RaceSimulationService;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
@@ -10,10 +10,13 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import org.springframework.context.annotation.Profile;
+
 import java.util.Map;
 
 @Configuration
 @Slf4j
+@Profile("!test")
 public class SocketIOConfig {
 
     @Value("${socket.io.port:4000}")
@@ -22,7 +25,7 @@ public class SocketIOConfig {
     private SocketIOServer server;
 
     @Bean
-    public SocketIOServer socketIOServer(RaceScheduler raceScheduler, RaceSimulationService simulationService, AuctionScheduler auctionScheduler) {
+    public SocketIOServer socketIOServer(RaceLifecycleManager raceLifecycleManager, RaceSimulationService simulationService, AuctionScheduler auctionScheduler) {
         com.corundumstudio.socketio.Configuration config = new com.corundumstudio.socketio.Configuration();
         config.setPort(port);
         config.setOrigin("http://localhost:3000");
@@ -73,7 +76,7 @@ public class SocketIOConfig {
         });
 
         server.start();
-        raceScheduler.setSocketIOServer(server);
+        raceLifecycleManager.setSocketIOServer(server);
         auctionScheduler.setSocketIOServer(server);
         log.info("[Socket.IO] Servidor iniciado en puerto {}", port);
 

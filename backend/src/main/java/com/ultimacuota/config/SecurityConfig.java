@@ -37,7 +37,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/races", "/api/races/*").permitAll()
                 .requestMatchers("/api/market").permitAll()
                 .requestMatchers("/api/users/**").permitAll()
-                .requestMatchers("/api/caballos/**").permitAll()
+                .requestMatchers("/api/horses/**").permitAll()
                 .requestMatchers("/api/auctions").permitAll()
                 .requestMatchers("/api/auctions/*").permitAll()
                 .requestMatchers("/socket.io/**").permitAll()

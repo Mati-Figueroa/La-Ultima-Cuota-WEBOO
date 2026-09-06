@@ -119,6 +119,7 @@ public class StableService {
         }
 
         caballoRepository.setForSale(horseId, precio, userId);
+        entityManager.clear();
 
         horse = caballoRepository.findById(horseId).orElseThrow();
         Map<String, Object> result = new HashMap<>();

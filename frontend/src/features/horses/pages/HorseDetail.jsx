@@ -13,7 +13,7 @@ function HorseDetail() {
 
   const fetchHorse = useCallback(async () => {
     try {
-      const response = await api.get(`/api/caballos/${id}`);
+      const response = await api.get(`/api/horses/${id}`);
       if (response.data.success) setHorse(response.data.data.horse);
     } catch {
       showToast('Caballo no encontrado', 'error');
