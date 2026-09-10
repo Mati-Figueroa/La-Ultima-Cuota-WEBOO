@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Container, Row, Col, Card, Button, Form, InputGroup } from 'react-bootstrap';
+import { io } from 'socket.io-client';
 import { useToast } from '../../../shared/context/ToastContext';
 import api from '../../../shared/services/api';
 
@@ -13,6 +14,7 @@ function AuctionList() {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('ending_soon');
   const [page, setPage] = useState(1);
+  const socketRef = useRef(null);
 
   const fetchAuctions = useCallback(async () => {
     setLoading(true);
@@ -31,6 +33,61 @@ function AuctionList() {
 
   useEffect(() => { fetchAuctions(); }, [fetchAuctions]);
 
+  // Real-time socket updates for auction cards
+  useEffect(() => {
+    const envUrl = process.env.REACT_APP_SOCKET_URL;
+    const socketUrl = (envUrl && !envUrl.includes('localhost'))
+      ? envUrl
+      : `http://${window.location.hostname || 'localhost'}:9092`;
+    const socket = io(socketUrl, {
+      transports: ['polling', 'websocket'],
+      reconnection: true,
+      reconnectionDelay: 1000,
+    });
+    socketRef.current = socket;
+
+    const handleBid = (data) => {
+      const targetId = Number(data?.subasta_id || data?.id);
+      if (!targetId) return;
+      setAuctions((prev) =>
+        prev.map((a) => {
+          if (a.id === targetId) {
+            return {
+              ...a,
+              precio_actual: data.precio_actual || (data.puja && data.puja.monto) || a.precio_actual,
+              total_pujas: (a.total_pujas || 0) + 1,
+            };
+          }
+          return a;
+        })
+      );
+    };
+
+    const handleEnded = (data) => {
+      const targetId = Number(data?.subasta_id || data?.id);
+      if (!targetId) return;
+      setAuctions((prev) => prev.filter((a) => a.id !== targetId));
+    };
+
+    socket.on('new_bid', handleBid);
+    socket.on('auction_bid', handleBid);
+    socket.on('auction_ended', handleEnded);
+
+    return () => {
+      socket.off('new_bid', handleBid);
+      socket.off('auction_bid', handleBid);
+      socket.off('auction_ended', handleEnded);
+      socket.disconnect();
+    };
+  }, []);
+
+  // Tick countdown every second for accurate minute/second display
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   const getTimeLeft = (fechaFin) => {
     const now = new Date();
     const end = new Date(fechaFin);
@@ -38,8 +95,10 @@ function AuctionList() {
     if (diff <= 0) return 'Finalizada';
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
     if (hours > 24) return `${Math.floor(hours / 24)}d ${hours % 24}h`;
-    return `${hours}h ${minutes}m`;
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m ${seconds}s`;
   };
 
   const totalPages = Math.max(1, Math.ceil(auctions.length / PAGE_SIZE));

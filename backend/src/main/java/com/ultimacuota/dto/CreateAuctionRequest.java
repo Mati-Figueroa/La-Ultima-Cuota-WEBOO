@@ -23,8 +23,12 @@ public class CreateAuctionRequest {
     @JsonAlias({"duracion_horas", "duracionHoras"})
     private Long duracionHoras; // 1, 6, 24, 48, 72
 
+    @JsonAlias({"duracion_minutos", "duracionMinutos"})
+    private Long duracionMinutos; // 1 minute option
+
     public void setCaballo_id(Long id) { this.caballoId = id; }
     public void setPrecio_inicial(BigDecimal p) { this.precioInicial = p; }
     public void setPrecio_reserva(BigDecimal p) { this.precioReserva = p; }
     public void setDuracion_horas(Long d) { this.duracionHoras = d; }
+    public void setDuracion_minutos(Long m) { this.duracionMinutos = m; }
 }

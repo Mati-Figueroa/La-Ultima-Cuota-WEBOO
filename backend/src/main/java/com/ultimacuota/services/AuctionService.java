@@ -94,14 +94,30 @@ public class AuctionService {
 
     @Transactional
     public Map<String, Object> createAuction(CreateAuctionRequest request, Long userId) {
-        if (request.getCaballoId() == null || request.getPrecioInicial() == null || request.getDuracionHoras() == null) {
+        boolean hasHoras = request.getDuracionHoras() != null && request.getDuracionHoras() > 0;
+        boolean hasMinutos = request.getDuracionMinutos() != null && request.getDuracionMinutos() > 0;
+
+        if (request.getCaballoId() == null || request.getPrecioInicial() == null || (!hasHoras && !hasMinutos)) {
             throw new IllegalArgumentException("Todos los campos son obligatorios");
         }
         if (request.getPrecioInicial().compareTo(BigDecimal.valueOf(100)) < 0) {
             throw new IllegalArgumentException("El precio inicial debe ser al menos $100 CC");
         }
-        if (request.getDuracionHoras() < 1 || request.getDuracionHoras() > 168) {
-            throw new IllegalArgumentException("La duración debe ser entre 1 y 168 horas");
+
+        LocalDateTime fechaFin;
+        String duracionDesc;
+        if (hasMinutos) {
+            if (request.getDuracionMinutos() < 1 || request.getDuracionMinutos() > 10080) {
+                throw new IllegalArgumentException("La duración en minutos debe ser entre 1 y 10080");
+            }
+            fechaFin = LocalDateTime.now().plusMinutes(request.getDuracionMinutos());
+            duracionDesc = request.getDuracionMinutos() + "m";
+        } else {
+            if (request.getDuracionHoras() < 1 || request.getDuracionHoras() > 168) {
+                throw new IllegalArgumentException("La duración debe ser entre 1 y 168 horas");
+            }
+            fechaFin = LocalDateTime.now().plusHours(request.getDuracionHoras());
+            duracionDesc = request.getDuracionHoras() + "h";
         }
 
         Caballo horse = caballoRepository.findById(request.getCaballoId())
@@ -130,13 +146,13 @@ public class AuctionService {
                 .precioInicial(request.getPrecioInicial())
                 .precioReserva(request.getPrecioReserva())
                 .fechaInicio(LocalDateTime.now())
-                .fechaFin(LocalDateTime.now().plusHours(request.getDuracionHoras()))
+                .fechaFin(fechaFin)
                 .estado("activa")
                 .build();
         auction = subastaRepository.save(auction);
 
-        log.info("[Auction] Subasta #{} creada por usuario {} para caballo {} ({}h)",
-                auction.getId(), userId, horse.getId(), request.getDuracionHoras());
+        log.info("[Auction] Subasta #{} creada por usuario {} para caballo {} ({})",
+                auction.getId(), userId, horse.getId(), duracionDesc);
 
         Map<String, Object> result = new HashMap<>();
         result.put("subasta", toAuctionMap(auction));
@@ -171,6 +187,14 @@ public class AuctionService {
         // Previous highest bid before this placement
         Optional<Puja> previousHighestBidOpt = pujaRepository.findHighestBid(auctionId);
 
+        // Check if the current bidder is raising their own highest bid
+        boolean isSelfRaise = previousHighestBidOpt.isPresent() &&
+                previousHighestBidOpt.get().getUsuario().getId().equals(userId);
+
+        BigDecimal lockedFunds = isSelfRaise
+                ? previousHighestBidOpt.get().getMonto()
+                : BigDecimal.ZERO;
+
         // Lock user balance check
         Query saldoQuery = entityManager.createNativeQuery(
                 "SELECT saldo FROM usuarios WHERE id = :id FOR UPDATE");
@@ -178,10 +202,7 @@ public class AuctionService {
         Object saldoResult = saldoQuery.getSingleResult();
         BigDecimal currentSaldo = new BigDecimal(saldoResult.toString());
 
-        Optional<Puja> userExistingBidOpt = pujaRepository.findBySubastaIdAndUsuarioIdOrderByMontoDesc(auctionId, userId);
-        BigDecimal previousUserBidAmount = userExistingBidOpt.map(Puja::getMonto).orElse(BigDecimal.ZERO);
-        BigDecimal effectiveUserSaldo = currentSaldo.add(previousUserBidAmount);
-
+        BigDecimal effectiveUserSaldo = currentSaldo.add(lockedFunds);
         if (effectiveUserSaldo.compareTo(request.getMonto()) < 0) {
             throw new InsufficientBalanceException(
                     String.format("Saldo insuficiente. Necesitas $%,.0f CC, tienes $%,.0f CC",
@@ -189,42 +210,40 @@ public class AuctionService {
         }
 
         // Refund previous outbid highest bidder if it was another user
-        if (previousHighestBidOpt.isPresent()) {
+        if (previousHighestBidOpt.isPresent() && !isSelfRaise) {
             Puja prevHighestBid = previousHighestBidOpt.get();
-            if (!prevHighestBid.getUsuario().getId().equals(userId)) {
-                Usuario outbidUser = usuarioRepository.findById(prevHighestBid.getUsuario().getId()).orElse(null);
-                if (outbidUser != null) {
-                    outbidUser.setSaldo(outbidUser.getSaldo().add(prevHighestBid.getMonto()));
-                    usuarioRepository.save(outbidUser);
+            Usuario outbidUser = usuarioRepository.findById(prevHighestBid.getUsuario().getId()).orElse(null);
+            if (outbidUser != null) {
+                outbidUser.setSaldo(outbidUser.getSaldo().add(prevHighestBid.getMonto()));
+                usuarioRepository.save(outbidUser);
 
-                    TransaccionSaldo outbidRefund = TransaccionSaldo.builder()
-                            .usuario(outbidUser)
-                            .tipo("ajuste_admin")
-                            .monto(prevHighestBid.getMonto())
-                            .saldoResultante(outbidUser.getSaldo())
-                            .referenciaTabla("subastas")
-                            .referenciaId(auctionId)
-                            .build();
-                    transaccionRepository.save(outbidRefund);
+                TransaccionSaldo outbidRefund = TransaccionSaldo.builder()
+                        .usuario(outbidUser)
+                        .tipo("ajuste_admin")
+                        .monto(prevHighestBid.getMonto())
+                        .saldoResultante(outbidUser.getSaldo())
+                        .referenciaTabla("subastas")
+                        .referenciaId(auctionId)
+                        .build();
+                transaccionRepository.save(outbidRefund);
 
-                    log.info("[Auction] Usuario {} superó la puja de usuario {}. Reembolsados ${} a usuario {}",
-                            userId, outbidUser.getId(), prevHighestBid.getMonto(), outbidUser.getId());
-                }
+                log.info("[Auction] Usuario {} superó la puja de usuario {}. Reembolsados ${} a usuario {}",
+                        userId, outbidUser.getId(), prevHighestBid.getMonto(), outbidUser.getId());
             }
         }
 
         // Deduct balance for bidder
         Usuario bidder = usuarioRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
-        BigDecimal newSaldo = effectiveUserSaldo.subtract(request.getMonto());
+        BigDecimal deduction = request.getMonto().subtract(lockedFunds);
+        BigDecimal newSaldo = currentSaldo.subtract(deduction);
         bidder.setSaldo(newSaldo);
         usuarioRepository.save(bidder);
 
-        BigDecimal deltaDeduction = request.getMonto().subtract(previousUserBidAmount);
         TransaccionSaldo bidTx = TransaccionSaldo.builder()
                 .usuario(bidder)
                 .tipo("puja_subasta")
-                .monto(deltaDeduction.negate())
+                .monto(deduction.negate())
                 .saldoResultante(newSaldo)
                 .referenciaTabla("subastas")
                 .referenciaId(auctionId)
@@ -232,6 +251,7 @@ public class AuctionService {
         transaccionRepository.save(bidTx);
 
         // Update or insert Puja record safely without Hibernate unique key collision
+        Optional<Puja> userExistingBidOpt = pujaRepository.findBySubastaIdAndUsuarioIdOrderByMontoDesc(auctionId, userId);
         Puja bid;
         if (userExistingBidOpt.isPresent()) {
             bid = userExistingBidOpt.get();

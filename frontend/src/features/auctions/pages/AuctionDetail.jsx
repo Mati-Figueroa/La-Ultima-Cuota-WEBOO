@@ -10,7 +10,7 @@ function AuctionDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const showToast = useToast();
-  const { user, updateUserSaldo } = useAuth();
+  const { user, updateUserSaldo, refreshUser } = useAuth();
   const socketRef = useRef(null);
 
   const [auction, setAuction] = useState(null);
@@ -39,34 +39,69 @@ function AuctionDetail() {
     const socketUrl = (envUrl && !envUrl.includes('localhost'))
       ? envUrl
       : `http://${window.location.hostname || 'localhost'}:9092`;
-    const socket = io(socketUrl, { transports: ['websocket', 'polling'] });
+    const socket = io(socketUrl, {
+      transports: ['polling', 'websocket'],
+      reconnection: true,
+      reconnectionDelay: 1000,
+    });
     socketRef.current = socket;
 
     socket.emit('join_auction', { subasta_id: Number(id) });
 
     const handleUpdate = (data) => {
-      if (Number(data.subasta_id) === Number(id)) {
+      const targetId = Number(data?.subasta_id || data?.id);
+      if (!targetId || targetId === Number(id)) {
+        if (data?.puja) {
+          setAuction((prev) => {
+            if (!prev) return prev;
+            const updatedPujas = [data.puja, ...(prev.pujas || []).filter((p) => p.id !== data.puja.id)];
+            return {
+              ...prev,
+              precio_actual: data.precio_actual || data.puja.monto || prev.precio_actual,
+              total_pujas: Math.max((prev.total_pujas || 0), updatedPujas.length),
+              estado: data.finalizada ? 'finalizada' : prev.estado,
+              ganador_username: data.ganador_username || prev.ganador_username,
+              pujas: updatedPujas,
+            };
+          });
+        }
+        if (data?.estado) {
+          setAuction((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              estado: data.estado,
+              ganador_id: data.ganador_id || prev.ganador_id,
+              ganador_username: data.ganador_username || prev.ganador_username,
+            };
+          });
+        }
         fetchAuction();
+        if (refreshUser) refreshUser();
       }
     };
 
     socket.on('auction_bid', handleUpdate);
     socket.on('new_bid', handleUpdate);
-    socket.on('auction_ended', handleUpdate);
+    socket.on('auction_ended', (data) => {
+      handleUpdate(data);
+      showToast('La subasta ha finalizado', 'info');
+    });
 
     return () => {
       socket.emit('leave_auction', { subasta_id: Number(id) });
       socket.off('auction_bid', handleUpdate);
       socket.off('new_bid', handleUpdate);
-      socket.off('auction_ended', handleUpdate);
+      socket.off('auction_ended');
       socket.disconnect();
     };
-  }, [id, fetchAuction]);
+  }, [id, fetchAuction, refreshUser, showToast]);
 
-  // Countdown timer
+  // Countdown timer with automatic expiration trigger
   useEffect(() => {
     if (!auction || auction.estado !== 'activa') return;
 
+    let expiredTriggered = false;
     const updateCountdown = () => {
       const now = new Date();
       const end = new Date(auction.fecha_fin);
@@ -75,6 +110,13 @@ function AuctionDetail() {
       if (diff <= 0) {
         setTimeLeft('Finalizada');
         setCountdown(0);
+        if (!expiredTriggered) {
+          expiredTriggered = true;
+          setTimeout(() => {
+            fetchAuction();
+            if (refreshUser) refreshUser();
+          }, 1200);
+        }
         return;
       }
 
@@ -93,7 +135,7 @@ function AuctionDetail() {
     updateCountdown();
     const interval = setInterval(updateCountdown, 1000);
     return () => clearInterval(interval);
-  }, [auction]);
+  }, [auction?.fecha_fin, auction?.estado, fetchAuction, refreshUser]);
 
   const handleBid = async () => {
     if (!bidAmount || Number(bidAmount) <= 0) {
@@ -166,7 +208,7 @@ function AuctionDetail() {
           </h2>
           <div className="d-flex align-items-center gap-3">
             <Badge className="px-3 py-2" style={{
-              backgroundColor: isActive ? '#0d6efd' : '#6c757d',
+              backgroundColor: isActive ? '#0d6efd' : auction.estado === 'cancelada' ? '#dc3545' : '#15BD0F',
               color: '#fff',
               borderRadius: '20px',
             }}>
@@ -333,6 +375,12 @@ function AuctionDetail() {
                   {auction.ganador_username
                     ? `Ganador: ${auction.ganador_username}`
                     : 'Subasta finalizada sin ganador'}
+                </Alert>
+              )}
+
+              {!isActive && auction.estado === 'cancelada' && (
+                <Alert variant="warning" className="mb-0">
+                  Subasta cancelada: No se alcanzó el precio de reserva. Todos los depósitos fueron reembolsados.
                 </Alert>
               )}
             </Card.Body>

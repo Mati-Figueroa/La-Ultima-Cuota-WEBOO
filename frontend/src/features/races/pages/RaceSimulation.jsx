@@ -42,7 +42,7 @@ function RaceSimulation() {
       ? envUrl
       : `http://${window.location.hostname || 'localhost'}:9092`;
 
-    const socket = io(socketUrl, { transports: ['websocket', 'polling'] });
+    const socket = io(socketUrl, { transports: ['polling', 'websocket'] });
     socketRef.current = socket;
     socket.emit('join_race', Number(id));
 

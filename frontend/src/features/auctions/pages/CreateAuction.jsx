@@ -13,7 +13,7 @@ function CreateAuction() {
   const [selectedHorse, setSelectedHorse] = useState('');
   const [precioInicial, setPrecioInicial] = useState('');
   const [precioReserva, setPrecioReserva] = useState('');
-  const [duracionHoras, setDuracionHoras] = useState('24');
+  const [duracion, setDuracion] = useState('24h');
 
   const fetchMyHorses = useCallback(async () => {
     try {
@@ -35,9 +35,17 @@ function CreateAuction() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedHorse || !precioInicial || !duracionHoras) {
+    if (!selectedHorse || !precioInicial || !duracion) {
       showToast('Completa todos los campos obligatorios', 'warning');
       return;
+    }
+
+    let duracionMinutos = null;
+    let duracionHoras = null;
+    if (duracion.endsWith('m')) {
+      duracionMinutos = parseInt(duracion, 10);
+    } else {
+      duracionHoras = parseInt(duracion, 10);
     }
 
     setSubmitting(true);
@@ -46,7 +54,8 @@ function CreateAuction() {
         caballoId: Number(selectedHorse),
         precioInicial: Number(precioInicial),
         precioReserva: precioReserva ? Number(precioReserva) : null,
-        duracionHoras: Number(duracionHoras),
+        duracionMinutos,
+        duracionHoras,
       });
       if (response.data.success) {
         showToast('Subasta creada exitosamente', 'success');
@@ -144,17 +153,18 @@ function CreateAuction() {
                   <Form.Group className="mb-4">
                     <Form.Label className="fw-medium">Duración *</Form.Label>
                     <Form.Select
-                      value={duracionHoras}
-                      onChange={(e) => setDuracionHoras(e.target.value)}
+                      value={duracion}
+                      onChange={(e) => setDuracion(e.target.value)}
                       required
                       style={{ borderRadius: '8px' }}
                     >
-                      <option value="1">1 hora</option>
-                      <option value="6">6 horas</option>
-                      <option value="24">24 horas</option>
-                      <option value="48">48 horas</option>
-                      <option value="72">72 horas</option>
-                      <option value="168">7 días</option>
+                      <option value="1m">⚡ 1 minuto (Prueba rápida)</option>
+                      <option value="1h">1 hora</option>
+                      <option value="6h">6 horas</option>
+                      <option value="24h">24 horas</option>
+                      <option value="48h">48 horas</option>
+                      <option value="72h">72 horas</option>
+                      <option value="168h">7 días</option>
                     </Form.Select>
                   </Form.Group>
 

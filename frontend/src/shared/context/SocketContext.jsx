@@ -31,7 +31,7 @@ export function SocketProvider({ children }) {
         ? envUrl
         : `http://${window.location.hostname || 'localhost'}:9092`;
       const socket = io(socketHost, {
-        transports: ['websocket', 'polling'],
+        transports: ['polling', 'websocket'],
         reconnection: true,
         reconnectionDelay: 1000,
         reconnectionAttempts: 10,

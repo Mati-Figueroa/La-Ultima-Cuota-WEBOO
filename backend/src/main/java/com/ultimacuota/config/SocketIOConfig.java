@@ -64,16 +64,18 @@ public class SocketIOConfig {
             client.leaveRoom("race_" + raceId);
         });
 
-        server.addEventListener("join_auction", Map.class, (client, data, ackSender) -> {
-            Number auctionIdNum = (Number) data.get("subasta_id");
-            if (auctionIdNum == null) return;
-            client.joinRoom("auction_" + auctionIdNum);
+        server.addEventListener("join_auction", Object.class, (client, data, ackSender) -> {
+            Long auctionId = extractId(data, "subasta_id", "auction_id", "id");
+            if (auctionId == null) return;
+            client.joinRoom("auction_" + auctionId);
+            log.info("[Socket] Cliente unió a sala auction_{}", auctionId);
         });
 
-        server.addEventListener("leave_auction", Map.class, (client, data, ackSender) -> {
-            Number auctionIdNum = (Number) data.get("subasta_id");
-            if (auctionIdNum == null) return;
-            client.leaveRoom("auction_" + auctionIdNum);
+        server.addEventListener("leave_auction", Object.class, (client, data, ackSender) -> {
+            Long auctionId = extractId(data, "subasta_id", "auction_id", "id");
+            if (auctionId == null) return;
+            client.leaveRoom("auction_" + auctionId);
+            log.info("[Socket] Cliente dejó sala auction_{}", auctionId);
         });
 
         server.start();

@@ -81,6 +81,15 @@ export function AuthProvider({ children }) {
     setUser((prev) => (prev ? { ...prev, saldo: newSaldo } : prev));
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    try {
+      const response = await api.get('/api/auth/me');
+      if (response.data.success) {
+        setUser(response.data.data.user);
+      }
+    } catch {}
+  }, []);
+
   const value = {
     user,
     token,
@@ -90,6 +99,7 @@ export function AuthProvider({ children }) {
     logout,
     updateUser,
     updateUserSaldo,
+    refreshUser,
     isAuthenticated: !!token && !!user,
   };
 
