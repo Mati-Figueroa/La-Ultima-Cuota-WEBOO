@@ -32,16 +32,22 @@ public class RaceScheduler {
     @Scheduled(fixedRate = 1000, initialDelay = 5000)
     public void tickSimulations() {
         for (Long raceId : raceLifecycleManager.getProcessedRaceIds()) {
-            if (simulationService.isRunning(raceId)) {
-                simulationService.tickSimulation(raceId);
-                Map<Long, Double> positions = simulationService.getPositions(raceId);
-                if (positions != null && socketIOServer != null) {
-                    Map<String, Object> data = new HashMap<>();
-                    data.put("carrera_id", raceId);
-                    data.put("positions", positions);
-                    data.put("elapsed", simulationService.getElapsed(raceId));
-                    socketIOServer.getBroadcastOperations().sendEvent("race_positions", data);
-                }
+            if (!simulationService.isRunning(raceId)) continue;
+
+            RaceSimulationService.TickResult tick = simulationService.tickSimulation(raceId);
+            if (tick == null) continue;
+
+            if (tick.positions != null && socketIOServer != null) {
+                Map<String, Object> data = new HashMap<>();
+                data.put("carrera_id", raceId);
+                data.put("positions", tick.positions);
+                data.put("elapsed", tick.elapsed);
+                socketIOServer.getBroadcastOperations().sendEvent("race_positions", data);
+            }
+
+            if (tick.results != null) {
+                log.info("[Scheduler] Carrera #{} terminada, liquidando", raceId);
+                raceLifecycleManager.settleRace(raceId, tick.results);
             }
         }
     }

@@ -20,6 +20,9 @@ public class RaceSimulationService {
 
     public static final int TRACK_WIDTH = 800;
     public static final int HORSE_WIDTH = 40;
+    public static final int TRACK_LENGTH = 1000;
+    public static final int FINISH_PX = TRACK_WIDTH - HORSE_WIDTH;
+    public static final double SPEED_SCALE = 0.65;
 
     private final ConcurrentHashMap<Long, RaceState> activeRaces = new ConcurrentHashMap<>();
 
@@ -27,41 +30,98 @@ public class RaceSimulationService {
         List<Inscripcion> inscripciones = inscripcionRepository.findByCarreraIdWithCaballo(raceId);
         if (inscripciones.isEmpty()) return;
 
+        List<SimHorse> horses = new ArrayList<>();
         Map<Long, Double> positions = new HashMap<>();
-        inscripciones.forEach(i -> positions.put(i.getCaballo().getId(), 0.0));
+        for (Inscripcion insc : inscripciones) {
+            Caballo c = insc.getCaballo();
+            SimHorse h = new SimHorse(
+                    c.getId(),
+                    c.getVelocidad() != null ? c.getVelocidad() : 50,
+                    c.getResistencia() != null ? c.getResistencia() : 50,
+                    c.getCorazon() != null ? c.getCorazon() : 50
+            );
+            horses.add(h);
+            positions.put(c.getId(), 0.0);
+        }
 
-        long startTime = System.currentTimeMillis();
-        RaceState state = new RaceState(positions, startTime, true);
+        RaceState state = new RaceState(horses, positions, System.currentTimeMillis(), true);
         activeRaces.put(raceId, state);
-
         log.info("[Simulation] Carrera #{} simulación iniciada", raceId);
     }
 
-    public void tickSimulation(Long raceId) {
+    public TickResult tickSimulation(Long raceId) {
         RaceState state = activeRaces.get(raceId);
-        if (state == null || !state.running) return;
+        if (state == null || !state.running) return null;
 
         Random rand = new Random();
-        state.positions.forEach((horseId, pos) -> {
-            if (pos >= TRACK_WIDTH - HORSE_WIDTH) return;
-            double speed = (rand.nextDouble() * 10 + 3) * 2;
-            state.positions.put(horseId, Math.min(pos + speed, TRACK_WIDTH - HORSE_WIDTH));
-        });
+        double elapsed = (System.currentTimeMillis() - state.startTime) / 1000.0;
+        List<SimHorse> finishedThisTick = new ArrayList<>();
 
-        boolean allFinished = state.positions.values().stream()
-                .allMatch(p -> p >= TRACK_WIDTH - HORSE_WIDTH);
+        for (SimHorse h : state.horses) {
+            if (h.finished) continue;
 
-        if (allFinished) {
+            double rngMove = rand.nextDouble() * 60 + 40;
+            double speedBonus = rngMove * (h.velocidad / 500.0);
+
+            double boostChance = 0.05 + (h.corazon * 0.001);
+            double boostMult = rand.nextDouble() < boostChance ? 1.5 : 1.0;
+
+            double fatigueMult = 1.0;
+            if (h.pos > 700) {
+                double tireChance = 1.0 - (h.resistencia / 120.0);
+                if (rand.nextDouble() < tireChance) fatigueMult = 0.7;
+            }
+
+            double step = (rngMove + speedBonus) * boostMult * fatigueMult * SPEED_SCALE;
+            double rawPos = h.pos + step;
+
+            if (rawPos >= TRACK_LENGTH) {
+                h.pos = TRACK_LENGTH;
+                h.finished = true;
+                double overshoot = rawPos - TRACK_LENGTH;
+                double timeCorrection = step > 0 ? overshoot / step : 0;
+                h.finishTime = Math.round((elapsed - timeCorrection) * 100) / 100.0;
+                finishedThisTick.add(h);
+            } else {
+                h.pos = rawPos;
+            }
+        }
+
+        if (!finishedThisTick.isEmpty()) {
+            finishedThisTick.sort(Comparator.comparingDouble(h -> h.finishTime));
+            state.finishOrder.addAll(finishedThisTick);
+        }
+
+        state.horses.forEach(h ->
+                state.positions.put(h.caballoId,
+                        (double) Math.round((h.pos / TRACK_LENGTH) * FINISH_PX)));
+
+        Map<Long, Double> snapshot = new HashMap<>(state.positions);
+
+        if (state.finishOrder.size() == state.horses.size()) {
             state.running = false;
             activeRaces.remove(raceId);
-            log.info("[Simulation] Carrera #{} terminada en {}s", raceId,
-                    (System.currentTimeMillis() - state.startTime) / 1000);
+            log.info("[Simulation] Carrera #{} terminada en {}s",
+                    raceId, Math.round(System.currentTimeMillis() - state.startTime) / 1000);
+
+            List<Map<String, Object>> results = new ArrayList<>();
+            for (int idx = 0; idx < state.finishOrder.size(); idx++) {
+                SimHorse h = state.finishOrder.get(idx);
+                Map<String, Object> r = new HashMap<>();
+                r.put("caballo_id", h.caballoId);
+                r.put("posicion", idx + 1);
+                r.put("tiempo", new BigDecimal(String.format("%.2f", h.finishTime)));
+                results.add(r);
+            }
+            return new TickResult(snapshot, (long) elapsed, results);
         }
+
+        return new TickResult(snapshot, (long) elapsed, null);
     }
 
     public Map<Long, Double> getPositions(Long raceId) {
         RaceState state = activeRaces.get(raceId);
-        return state != null ? state.positions : null;
+        return state != null ? new HashMap<>(state.positions) : null;
     }
 
     public boolean isRunning(Long raceId) {
@@ -77,8 +137,6 @@ public class RaceSimulationService {
     public List<Map<String, Object>> generateBotBets(Long raceId, List<Inscripcion> inscriptions) {
         List<Inscripcion> botHorses = inscriptions.stream()
                 .filter(i -> i.getCaballo().getEsBot()).toList();
-        List<Inscripcion> humanHorses = inscriptions.stream()
-                .filter(i -> !i.getCaballo().getEsBot()).toList();
 
         List<Map<String, Object>> allBotBets = new ArrayList<>();
         BigDecimal totalPool = BigDecimal.ZERO;
@@ -133,14 +191,46 @@ public class RaceSimulationService {
     }
 
     public static class RaceState {
+        public final List<SimHorse> horses;
         public final Map<Long, Double> positions;
+        public final List<SimHorse> finishOrder = new ArrayList<>();
         public final long startTime;
         public volatile boolean running;
 
-        public RaceState(Map<Long, Double> positions, long startTime, boolean running) {
+        public RaceState(List<SimHorse> horses, Map<Long, Double> positions, long startTime, boolean running) {
+            this.horses = horses;
             this.positions = positions;
             this.startTime = startTime;
             this.running = running;
+        }
+    }
+
+    public static class SimHorse {
+        public final Long caballoId;
+        public final int velocidad;
+        public final int resistencia;
+        public final int corazon;
+        public double pos;
+        public boolean finished;
+        public double finishTime;
+
+        public SimHorse(Long caballoId, int velocidad, int resistencia, int corazon) {
+            this.caballoId = caballoId;
+            this.velocidad = velocidad;
+            this.resistencia = resistencia;
+            this.corazon = corazon;
+        }
+    }
+
+    public static class TickResult {
+        public final Map<Long, Double> positions;
+        public final long elapsed;
+        public final List<Map<String, Object>> results;
+
+        public TickResult(Map<Long, Double> positions, long elapsed, List<Map<String, Object>> results) {
+            this.positions = positions;
+            this.elapsed = elapsed;
+            this.results = results;
         }
     }
 }

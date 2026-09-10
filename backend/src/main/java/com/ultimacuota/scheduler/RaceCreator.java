@@ -78,27 +78,23 @@ public class RaceCreator {
     @Transactional
     public void createBotBets(Long raceId, List<Inscripcion> inscriptions) {
         try {
-            List<Inscripcion> botHorses = inscriptions.stream()
-                    .filter(i -> i.getCaballo().getEsBot()).toList();
+            List<Map<String, Object>> botBetData = simulationService.generateBotBets(raceId, inscriptions);
 
             BigDecimal totalPool = BigDecimal.ZERO;
             List<Apuesta> allBotBets = new ArrayList<>();
 
-            for (Inscripcion bot : botHorses) {
-                List<Map<String, Object>> botBetData = simulationService.generateBotBets(raceId, inscriptions);
-                for (Map<String, Object> bd : botBetData) {
-                    Caballo caballo = caballoRepository.getReferenceById((Long) bd.get("caballo_id"));
-                    Apuesta bet = Apuesta.builder()
-                            .usuario(null)
-                            .carrera(carreraRepository.getReferenceById(raceId))
-                            .caballo(caballo)
-                            .monto(new BigDecimal(bd.get("monto").toString()))
-                            .cuota(BigDecimal.ONE)
-                            .estado("pendiente")
-                            .build();
-                    allBotBets.add(bet);
-                    totalPool = totalPool.add(bet.getMonto());
-                }
+            for (Map<String, Object> bd : botBetData) {
+                Caballo caballo = caballoRepository.getReferenceById((Long) bd.get("caballo_id"));
+                Apuesta bet = Apuesta.builder()
+                        .usuario(null)
+                        .carrera(carreraRepository.getReferenceById(raceId))
+                        .caballo(caballo)
+                        .monto(new BigDecimal(bd.get("monto").toString()))
+                        .cuota(BigDecimal.ONE)
+                        .estado("pendiente")
+                        .build();
+                allBotBets.add(bet);
+                totalPool = totalPool.add(bet.getMonto());
             }
 
             for (Apuesta bet : allBotBets) {

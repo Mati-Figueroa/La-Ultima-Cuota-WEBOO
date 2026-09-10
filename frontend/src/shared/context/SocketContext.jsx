@@ -19,7 +19,7 @@ export function SocketProvider({ children }) {
 
     const connect = () => {
       if (socketRef.current?.connected) return;
-      const socketUrl = process.env.REACT_APP_SOCKET_URL || process.env.REACT_APP_API_URL || 'http://localhost:4000';
+      const socketUrl = process.env.REACT_APP_SOCKET_URL || process.env.REACT_APP_API_URL || `http://${window.location.hostname}:4000`;
       const socket = io(socketUrl, {
         transports: ['websocket', 'polling'],
         reconnection: true,

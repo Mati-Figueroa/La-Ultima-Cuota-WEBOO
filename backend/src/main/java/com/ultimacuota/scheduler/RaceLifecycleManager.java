@@ -3,6 +3,7 @@ package com.ultimacuota.scheduler;
 import com.ultimacuota.models.*;
 import com.ultimacuota.repositories.*;
 import com.ultimacuota.services.BetSettlementService;
+import com.ultimacuota.services.RaceSimulationService;
 import com.corundumstudio.socketio.SocketIOServer;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -28,12 +29,14 @@ public class RaceLifecycleManager {
     private final ResultadoCarreraRepository resultadoRepository;
     private final BetSettlementService betSettlementService;
     private final RaceCreator raceCreator;
+    private final RaceSimulationService simulationService;
 
     @PersistenceContext
     private EntityManager entityManager;
 
     private SocketIOServer socketIOServer;
     private final Set<Long> processedRaceIds = ConcurrentHashMap.newKeySet();
+    private final Set<Long> settlingRaces = ConcurrentHashMap.newKeySet();
 
     public void setSocketIOServer(SocketIOServer server) {
         this.socketIOServer = server;
@@ -62,6 +65,7 @@ public class RaceLifecycleManager {
                 }
 
                 processedRaceIds.add(race.getId());
+                simulationService.startSimulation(race.getId());
 
                 if (socketIOServer != null) {
                     socketIOServer.getBroadcastOperations().sendEvent("race_started",
@@ -76,50 +80,73 @@ public class RaceLifecycleManager {
                     .orElse(BigDecimal.valueOf(30));
 
             for (Carrera race : toFinish) {
+                if (simulationService.isRunning(race.getId())) continue;
+
                 long elapsed = java.time.Duration.between(race.getFechaInicioReal(), now).getSeconds();
                 if (elapsed < raceDuration.longValue()) continue;
 
-                if (resultadoRepository.existsByCarreraId(race.getId())) {
-                    race.setEstado("finalizada");
-                    race.setFechaFinReal(now);
-                    carreraRepository.save(race);
-                    processedRaceIds.remove(race.getId());
-                    continue;
-                }
-
-                List<Inscripcion> inscriptions = inscripcionRepository.findByCarreraIdWithCaballo(race.getId());
-                if (!inscriptions.isEmpty()) {
-                    List<Map<String, Object>> results = simulateResults(inscriptions);
-
-                    for (Map<String, Object> r : results) {
-                        Caballo caballo = caballoRepository.getReferenceById((Long) r.get("caballo_id"));
-                        ResultadoCarrera resultado = ResultadoCarrera.builder()
-                                .carrera(race)
-                                .caballo(caballo)
-                                .posicionFinal((Integer) r.get("posicion"))
-                                .tiempoFinal(new BigDecimal(r.get("tiempo").toString()))
-                                .build();
-                        resultadoRepository.save(resultado);
-                    }
-
-                    if (race.getTieneInteraccionHumana()) {
-                        betSettlementService.settleRace(race.getId(), results);
-                        race.setEstado("finalizada");
-                        race.setFechaFinReal(now);
-                        carreraRepository.save(race);
-                        log.info("[Lifecycle] Carrera #{} finalizada", race.getId());
-                    } else {
-                        carreraRepository.delete(race);
-                        log.info("[Lifecycle] Carrera #{} eliminada (solo bots)", race.getId());
-                    }
-                } else {
-                    carreraRepository.delete(race);
-                    log.info("[Lifecycle] Carrera #{} eliminada (sin inscripciones)", race.getId());
-                }
-                processedRaceIds.remove(race.getId());
+                settleRace(race.getId(), null);
             }
         } catch (Exception e) {
             log.error("[Lifecycle] Error en transiciones: {}", e.getMessage());
+        }
+    }
+
+    @Transactional
+    public void settleRace(Long raceId, List<Map<String, Object>> finishOrder) {
+        if (settlingRaces.contains(raceId)) return;
+        settlingRaces.add(raceId);
+
+        try {
+            Carrera race = carreraRepository.findById(raceId).orElse(null);
+            if (race == null) return;
+
+            if (resultadoRepository.existsByCarreraId(raceId)) {
+                if (!"finalizada".equals(race.getEstado())) {
+                    race.setEstado("finalizada");
+                    race.setFechaFinReal(LocalDateTime.now());
+                    carreraRepository.save(race);
+                }
+                return;
+            }
+
+            List<Inscripcion> inscriptions = inscripcionRepository.findByCarreraIdWithCaballo(raceId);
+            if (inscriptions.isEmpty()) {
+                carreraRepository.delete(race);
+                log.info("[Lifecycle] Carrera #{} eliminada (sin inscripciones)", raceId);
+                return;
+            }
+
+            List<Map<String, Object>> results = finishOrder != null ? finishOrder : simulateResults(inscriptions);
+
+            for (Map<String, Object> r : results) {
+                Caballo caballo = caballoRepository.getReferenceById((Long) r.get("caballo_id"));
+                ResultadoCarrera resultado = ResultadoCarrera.builder()
+                        .carrera(race)
+                        .caballo(caballo)
+                        .posicionFinal((Integer) r.get("posicion"))
+                        .tiempoFinal(new BigDecimal(r.get("tiempo").toString()))
+                        .build();
+                resultadoRepository.save(resultado);
+            }
+
+            if (!race.getTieneInteraccionHumana()) {
+                carreraRepository.delete(race);
+                log.info("[Lifecycle] Carrera #{} eliminada (solo bots)", raceId);
+                return;
+            }
+
+            betSettlementService.settleRace(raceId, results);
+
+            race.setEstado("finalizada");
+            race.setFechaFinReal(LocalDateTime.now());
+            carreraRepository.save(race);
+            log.info("[Lifecycle] Carrera #{} finalizada", raceId);
+        } catch (Exception e) {
+            log.error("[Lifecycle] Error liquidando carrera #{}: {}", raceId, e.getMessage());
+        } finally {
+            settlingRaces.remove(raceId);
+            processedRaceIds.remove(raceId);
         }
     }
 
