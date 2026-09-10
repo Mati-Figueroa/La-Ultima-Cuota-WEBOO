@@ -35,28 +35,30 @@ function AuctionDetail() {
 
   // Socket.IO for real-time bids
   useEffect(() => {
-    const socketUrl = process.env.REACT_APP_SOCKET_URL || process.env.REACT_APP_API_URL || 'http://localhost:4000';
+    const envUrl = process.env.REACT_APP_SOCKET_URL;
+    const socketUrl = (envUrl && !envUrl.includes('localhost'))
+      ? envUrl
+      : `http://${window.location.hostname || 'localhost'}:9092`;
     const socket = io(socketUrl, { transports: ['websocket', 'polling'] });
     socketRef.current = socket;
 
     socket.emit('join_auction', { subasta_id: Number(id) });
 
-    socket.on('auction_bid', (data) => {
-      if (data.subasta_id === Number(id)) {
-        fetchAuction(); // Refresh auction data
-      }
-    });
-
-    socket.on('auction_ended', (data) => {
-      if (data.subasta_id === Number(id)) {
+    const handleUpdate = (data) => {
+      if (Number(data.subasta_id) === Number(id)) {
         fetchAuction();
       }
-    });
+    };
+
+    socket.on('auction_bid', handleUpdate);
+    socket.on('new_bid', handleUpdate);
+    socket.on('auction_ended', handleUpdate);
 
     return () => {
       socket.emit('leave_auction', { subasta_id: Number(id) });
-      socket.off('auction_bid');
-      socket.off('auction_ended');
+      socket.off('auction_bid', handleUpdate);
+      socket.off('new_bid', handleUpdate);
+      socket.off('auction_ended', handleUpdate);
       socket.disconnect();
     };
   }, [id, fetchAuction]);
@@ -105,7 +107,11 @@ function AuctionDetail() {
         monto: Number(bidAmount),
       });
       if (response.data.success) {
-        showToast(`Puja realizada: $${Number(bidAmount).toLocaleString('es-CL')} CC`, 'success');
+        if (response.data.data.finalizada) {
+          showToast('¡Subasta finalizada! Se alcanzó el precio de reserva y se completó la transacción.', 'success');
+        } else {
+          showToast(`Puja realizada: $${Number(bidAmount).toLocaleString('es-CL')} CC`, 'success');
+        }
         if (response.data.data.saldo !== undefined) {
           updateUserSaldo(response.data.data.saldo);
         }
@@ -183,39 +189,27 @@ function AuctionDetail() {
                 <i className="bi bi-heart-fill me-2" style={{ color: 'var(--color-primary)' }}></i>{auction.caballo_nombre}
               </h5>
               <div className="row g-3" style={{ fontSize: '0.9rem' }}>
-                <div className="col-6 col-md-3">
+                <div className="col-6 col-md-4">
                   <span className="text-muted d-block">Edad</span>
                   <span className="font-mono fw-bold">{auction.caballo_edad} años</span>
                 </div>
-                <div className="col-6 col-md-3">
-                  <span className="text-muted d-block">Velocidad</span>
-                  <span className="font-mono fw-bold">{auction.caballo_velocidad}/100</span>
-                </div>
-                <div className="col-6 col-md-3">
-                  <span className="text-muted d-block">Resistencia</span>
-                  <span className="font-mono fw-bold">{auction.caballo_resistencia}/100</span>
-                </div>
-                <div className="col-6 col-md-3">
-                  <span className="text-muted d-block">Corazón</span>
-                  <span className="font-mono fw-bold">{auction.caballo_corazon}/100</span>
-                </div>
-                <div className="col-6 col-md-3">
-                  <span className="text-muted d-block">Fatiga</span>
-                  <span className="font-mono fw-bold">{auction.caballo_fatiga}%</span>
-                </div>
-                <div className="col-6 col-md-3">
-                  <span className="text-muted d-block">Carreras</span>
-                  <span className="font-mono fw-bold">{auction.caballo_carreras}</span>
-                </div>
-                <div className="col-6 col-md-3">
-                  <span className="text-muted d-block">Victorias</span>
-                  <span className="font-mono fw-bold">{auction.caballo_victorias}</span>
-                </div>
-                <div className="col-6 col-md-3">
+                <div className="col-6 col-md-4">
                   <span className="text-muted d-block">Winrate</span>
                   <span className="font-mono fw-bold">
                     {auction.caballo_carreras > 0 ? `${((auction.caballo_victorias / auction.caballo_carreras) * 100).toFixed(0)}%` : '0%'}
                   </span>
+                </div>
+                <div className="col-6 col-md-4">
+                  <span className="text-muted d-block">Fatiga</span>
+                  <span className="font-mono fw-bold">{auction.caballo_fatiga}%</span>
+                </div>
+                <div className="col-6 col-md-4">
+                  <span className="text-muted d-block">Carreras Totales</span>
+                  <span className="font-mono fw-bold">{auction.caballo_carreras}</span>
+                </div>
+                <div className="col-6 col-md-4">
+                  <span className="text-muted d-block">Victorias</span>
+                  <span className="font-mono fw-bold">{auction.caballo_victorias}</span>
                 </div>
               </div>
             </Card.Body>
@@ -236,6 +230,13 @@ function AuctionDetail() {
                       }}>
                       <div className="d-flex align-items-center gap-2">
                         {idx === 0 && <i className="bi bi-trophy-fill" style={{ color: '#FFD700' }}></i>}
+                        {bid.usuario_photo || bid.usuario_profile_photo ? (
+                          <img
+                            src={bid.usuario_photo || bid.usuario_profile_photo}
+                            alt=""
+                            style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover' }}
+                          />
+                        ) : null}
                         <Link to={`/perfil/${bid.usuario_id}`} className="fw-medium text-decoration-none" style={{ color: 'var(--color-text-dark)' }}>
                           {bid.usuario_username}
                         </Link>
@@ -341,7 +342,15 @@ function AuctionDetail() {
             <Card.Body className="p-4">
               <h6 className="font-heading fw-bold mb-2">Vendedor</h6>
               <Link to={`/perfil/${auction.vendedor_id}`} className="d-flex align-items-center gap-2 text-decoration-none">
-                <i className="bi bi-person-circle" style={{ fontSize: '1.5rem', color: 'var(--color-primary)' }}></i>
+                {auction.vendedor_photo || auction.vendedor_profile_photo ? (
+                  <img
+                    src={auction.vendedor_photo || auction.vendedor_profile_photo}
+                    alt=""
+                    style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--color-primary)' }}
+                  />
+                ) : (
+                  <i className="bi bi-person-circle" style={{ fontSize: '1.5rem', color: 'var(--color-primary)' }}></i>
+                )}
                 <span className="fw-medium" style={{ color: 'var(--color-text-dark)' }}>{auction.vendedor_username}</span>
               </Link>
             </Card.Body>

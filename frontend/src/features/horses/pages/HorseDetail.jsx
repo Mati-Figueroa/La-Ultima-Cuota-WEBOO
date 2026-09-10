@@ -78,24 +78,14 @@ function HorseDetail() {
               <div className="d-flex flex-column gap-3">
                 <div>
                   <div className="d-flex justify-content-between mb-1">
-                    <span className="text-muted">Velocidad</span>
-                    <span className="font-mono fw-bold">{horse.velocidad}/100</span>
+                    <span className="text-muted">Winrate</span>
+                    <span className="font-mono fw-bold text-success">{getWinrate()}</span>
                   </div>
-                  <ProgressBar now={horse.velocidad} variant="success" style={{ height: '8px' }} />
-                </div>
-                <div>
-                  <div className="d-flex justify-content-between mb-1">
-                    <span className="text-muted">Resistencia</span>
-                    <span className="font-mono fw-bold">{horse.resistencia}/100</span>
-                  </div>
-                  <ProgressBar now={horse.resistencia} variant="info" style={{ height: '8px' }} />
-                </div>
-                <div>
-                  <div className="d-flex justify-content-between mb-1">
-                    <span className="text-muted">Corazón</span>
-                    <span className="font-mono fw-bold">{horse.corazon}/100</span>
-                  </div>
-                  <ProgressBar now={horse.corazon} variant="warning" style={{ height: '8px' }} />
+                  <ProgressBar
+                    now={horse.carreras_totales > 0 ? (horse.victorias / horse.carreras_totales) * 100 : 0}
+                    variant="success"
+                    style={{ height: '8px' }}
+                  />
                 </div>
                 <div>
                   <div className="d-flex justify-content-between mb-1">
@@ -156,13 +146,13 @@ function HorseDetail() {
                     style={{
                       width: '48px',
                       height: '48px',
-                      backgroundColor: horse.owner.profile_photo ? 'transparent' : 'rgba(21, 189, 15, 0.1)',
+                      backgroundColor: (horse.owner.profile_photo || horse.owner.profilePhoto) ? 'transparent' : 'rgba(21, 189, 15, 0.1)',
                       border: '2px solid var(--color-primary)',
                       overflow: 'hidden',
                     }}
                   >
-                    {horse.owner.profile_photo ? (
-                      <img src={horse.owner.profile_photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    {horse.owner.profile_photo || horse.owner.profilePhoto ? (
+                      <img src={horse.owner.profile_photo || horse.owner.profilePhoto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (
                       <i className="bi bi-person-fill" style={{ fontSize: '1.2rem', color: 'var(--color-primary)' }}></i>
                     )}

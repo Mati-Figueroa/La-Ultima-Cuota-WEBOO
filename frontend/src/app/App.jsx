@@ -23,6 +23,7 @@ import HorseDetail from '../features/horses/pages/HorseDetail';
 import AuctionList from '../features/auctions/pages/AuctionList';
 import AuctionDetail from '../features/auctions/pages/AuctionDetail';
 import CreateAuction from '../features/auctions/pages/CreateAuction';
+import UserList from '../features/profile/pages/UserList';
 
 function App() {
   return (
@@ -180,6 +181,16 @@ function App() {
                 <PrivateRoute>
                   <DashboardLayout>
                     <CreateAuction />
+                  </DashboardLayout>
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/usuarios"
+              element={
+                <PrivateRoute>
+                  <DashboardLayout>
+                    <UserList />
                   </DashboardLayout>
                 </PrivateRoute>
               }

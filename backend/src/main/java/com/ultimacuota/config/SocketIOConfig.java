@@ -3,6 +3,7 @@ package com.ultimacuota.config;
 import com.corundumstudio.socketio.SocketIOServer;
 import com.ultimacuota.scheduler.AuctionScheduler;
 import com.ultimacuota.scheduler.RaceLifecycleManager;
+import com.ultimacuota.services.AuctionService;
 import com.ultimacuota.services.RaceSimulationService;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
@@ -25,10 +26,10 @@ public class SocketIOConfig {
     private SocketIOServer server;
 
     @Bean
-    public SocketIOServer socketIOServer(RaceLifecycleManager raceLifecycleManager, RaceSimulationService simulationService, AuctionScheduler auctionScheduler) {
+    public SocketIOServer socketIOServer(RaceLifecycleManager raceLifecycleManager, RaceSimulationService simulationService, AuctionScheduler auctionScheduler, AuctionService auctionService) {
         com.corundumstudio.socketio.Configuration config = new com.corundumstudio.socketio.Configuration();
         config.setPort(port);
-        config.setOrigin("http://localhost:3000");
+        config.setOrigin(null);
         config.setAllowCustomRequests(true);
 
         server = new SocketIOServer(config);
@@ -41,26 +42,26 @@ public class SocketIOConfig {
             log.info("[Socket] Cliente desconectado: {}", client.getSessionId());
         });
 
-        server.addEventListener("join_race", Map.class, (client, data, ackSender) -> {
-            Number raceIdNum = (Number) data.get("carrera_id");
-            if (raceIdNum == null) return;
-            long raceId = raceIdNum.longValue();
+        server.addEventListener("join_race", Object.class, (client, data, ackSender) -> {
+            Long raceId = extractId(data, "carrera_id", "race_id");
+            if (raceId == null) return;
             client.joinRoom("race_" + raceId);
+            log.info("[Socket] Cliente unió a sala race_{}", raceId);
 
             Map<Long, Double> positions = simulationService.getPositions(raceId);
             if (positions != null) {
                 Map<String, Object> posData = new java.util.HashMap<>();
                 posData.put("carrera_id", raceId);
                 posData.put("positions", positions);
-                posData.put("elapsed", 0);
+                posData.put("elapsed", simulationService.getElapsed(raceId));
                 client.sendEvent("race_positions", posData);
             }
         });
 
-        server.addEventListener("leave_race", Map.class, (client, data, ackSender) -> {
-            Number raceIdNum = (Number) data.get("carrera_id");
-            if (raceIdNum == null) return;
-            client.leaveRoom("race_" + raceIdNum.longValue());
+        server.addEventListener("leave_race", Object.class, (client, data, ackSender) -> {
+            Long raceId = extractId(data, "carrera_id", "race_id");
+            if (raceId == null) return;
+            client.leaveRoom("race_" + raceId);
         });
 
         server.addEventListener("join_auction", Map.class, (client, data, ackSender) -> {
@@ -78,9 +79,26 @@ public class SocketIOConfig {
         server.start();
         raceLifecycleManager.setSocketIOServer(server);
         auctionScheduler.setSocketIOServer(server);
+        auctionService.setSocketIOServer(server);
         log.info("[Socket.IO] Servidor iniciado en puerto {}", port);
 
         return server;
+    }
+
+    private Long extractId(Object data, String... keys) {
+        if (data instanceof Number n) {
+            return n.longValue();
+        }
+        if (data instanceof Map<?, ?> m) {
+            for (String key : keys) {
+                Object val = m.get(key);
+                if (val instanceof Number n) return n.longValue();
+                if (val instanceof String s) {
+                    try { return Long.parseLong(s); } catch (Exception ignored) {}
+                }
+            }
+        }
+        return null;
     }
 
     @PreDestroy

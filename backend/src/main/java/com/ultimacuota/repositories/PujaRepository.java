@@ -13,11 +13,12 @@ import java.util.Optional;
 @Repository
 public interface PujaRepository extends JpaRepository<Puja, Long> {
 
-    List<Puja> findBySubastaIdOrderByMontoDescFechaAsc(Long subastaId);
+    @Query("SELECT p FROM Puja p JOIN FETCH p.usuario WHERE p.subasta.id = :subastaId ORDER BY p.monto DESC, p.fecha ASC")
+    List<Puja> findBySubastaIdOrderByMontoDescFechaAsc(@Param("subastaId") Long subastaId);
 
     Optional<Puja> findBySubastaIdAndUsuarioIdOrderByMontoDesc(Long subastaId, Long usuarioId);
 
-    @Query("SELECT p FROM Puja p WHERE p.subasta.id = :subastaId ORDER BY p.monto DESC LIMIT 1")
+    @Query("SELECT p FROM Puja p JOIN FETCH p.usuario WHERE p.subasta.id = :subastaId ORDER BY p.monto DESC LIMIT 1")
     Optional<Puja> findHighestBid(@Param("subastaId") Long subastaId);
 
     @Query("SELECT COUNT(p) FROM Puja p WHERE p.subasta.id = :subastaId")

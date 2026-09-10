@@ -4,7 +4,7 @@ const LANE_HEIGHT = 44;
 const FINISH_PX = 760;
 const LANE_COLORS = ['#15BD0F', '#0d6efd', '#fd7e14', '#dc3545', '#6f42c1', '#20c997', '#e83e8c', '#ffc107', '#17a2b8', '#343a40', '#007bff', '#28a745'];
 
-function RaceTrack({ inscriptions = [], positions = {} }) {
+function RaceTrack({ inscriptions = [], positions = {}, rankings = {} }) {
   const trackHeight = inscriptions.length * LANE_HEIGHT + 16;
 
   return (
@@ -63,6 +63,7 @@ function RaceTrack({ inscriptions = [], positions = {} }) {
 
         {inscriptions.map((insc, idx) => {
           const pos = positions[insc.caballo_id] || 0;
+          const rank = rankings[insc.caballo_id];
           const laneTop = idx * LANE_HEIGHT + 8 + (LANE_HEIGHT - 28) / 2;
           const color = LANE_COLORS[idx % LANE_COLORS.length];
           const finished = pos >= FINISH_PX;
@@ -75,11 +76,27 @@ function RaceTrack({ inscriptions = [], positions = {} }) {
                 top: `${laneTop}px`,
                 display: 'flex',
                 alignItems: 'center',
-                gap: '5px',
-                transition: 'left 1s ease-out',
+                gap: '6px',
+                transition: 'left 1s linear',
                 zIndex: 2,
               }}
             >
+              {rank && (
+                <span
+                  style={{
+                    fontSize: '0.72rem',
+                    fontWeight: 'bold',
+                    backgroundColor: rank === 1 ? '#FFD700' : rank === 2 ? '#C0C0C0' : rank === 3 ? '#CD7F32' : '#6c757d',
+                    color: rank <= 3 ? '#000' : '#fff',
+                    padding: '2px 7px',
+                    borderRadius: '12px',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                    flexShrink: 0,
+                  }}
+                >
+                  #{rank}
+                </span>
+              )}
               <span
                 className="fw-bold"
                 style={{
@@ -89,6 +106,7 @@ function RaceTrack({ inscriptions = [], positions = {} }) {
                   backgroundColor: finished ? '#15BD0F' : 'rgba(255,255,255,0.85)',
                   padding: '2px 6px',
                   borderRadius: '4px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
                 }}
               >
                 {insc.caballo_nombre || insc.nombre || `Caballo ${insc.caballo_id}`}
@@ -98,14 +116,14 @@ function RaceTrack({ inscriptions = [], positions = {} }) {
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  width: '28px',
-                  height: '28px',
+                  width: '24px',
+                  height: '24px',
                   borderRadius: '50%',
                   backgroundColor: color,
                   color: '#fff',
-                  fontSize: '0.75rem',
+                  fontSize: '0.72rem',
                   fontWeight: 700,
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
                   flexShrink: 0,
                 }}
               >

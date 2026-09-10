@@ -10,6 +10,7 @@ const SIDEBAR_ITEMS = [
   { path: '/calendario', label: 'Carreras', icon: 'bi-flag' },
   { path: '/gacha', label: 'Gacha', icon: 'bi-dice-5' },
   { path: '/historial', label: 'Historial', icon: 'bi-clock-history' },
+  { path: '/usuarios', label: 'Usuarios', icon: 'bi-people' },
   { path: '/simulador', label: 'Simulador', icon: 'bi-play-circle' },
 ];
 

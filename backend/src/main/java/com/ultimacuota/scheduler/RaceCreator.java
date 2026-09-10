@@ -24,18 +24,8 @@ public class RaceCreator {
     private final RaceSimulationService simulationService;
 
     @Transactional
-    public Carrera createRaceWithBots(int offsetMinutes) {
+    public Carrera createRaceAt(LocalDateTime startIn) {
         try {
-            LocalDateTime now = LocalDateTime.now().plusMinutes(offsetMinutes);
-            int mins = now.getMinute();
-            int alignedSlot = (mins / 10) * 10 + 10;
-            LocalDateTime startIn;
-            if (alignedSlot >= 60) {
-                startIn = now.plusHours(1).withMinute(alignedSlot - 60).withSecond(0).withNano(0);
-            } else {
-                startIn = now.withMinute(alignedSlot).withSecond(0).withNano(0);
-            }
-
             Carrera race = Carrera.builder()
                     .nombre(null)
                     .estado("programada")
@@ -73,6 +63,18 @@ public class RaceCreator {
             log.error("[RaceCreator] Error creando carrera: {}", e.getMessage());
             return null;
         }
+    }
+
+    @Transactional
+    public Carrera createRaceWithBots(int offsetMinutes) {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime startIn;
+        if (offsetMinutes == 0) {
+            startIn = now.plusMinutes(1).withSecond(0).withNano(0);
+        } else {
+            startIn = now.plusMinutes(offsetMinutes).withSecond(0).withNano(0);
+        }
+        return createRaceAt(startIn);
     }
 
     @Transactional

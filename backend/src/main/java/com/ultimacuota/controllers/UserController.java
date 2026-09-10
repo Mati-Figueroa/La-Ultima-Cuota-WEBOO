@@ -17,6 +17,14 @@ public class UserController {
 
     private final UserService userService;
 
+    @GetMapping
+    public ResponseEntity<ApiResponse<Object>> getUsers(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String search) {
+        return ResponseEntity.ok(ApiResponse.ok(userService.getPaginatedUsers(page, size, search)));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<Object>> getUserProfile(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(Map.of("user", userService.getUserProfile(id))));

@@ -26,6 +26,14 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.placeholder-white::placeholder {
+  color: rgba(255, 255, 255, 0.75) !important;
+}
+
+.placeholder-white {
+  color: #ffffff !important;
+}
+
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-heading);
   font-weight: 700;

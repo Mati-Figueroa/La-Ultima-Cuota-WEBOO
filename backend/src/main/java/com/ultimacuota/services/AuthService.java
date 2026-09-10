@@ -99,7 +99,8 @@ public class AuthService {
         }
 
         if (request.getProfilePhoto() != null) {
-            user.setProfilePhoto(request.getProfilePhoto());
+            String photo = request.getProfilePhoto().trim();
+            user.setProfilePhoto(photo.isEmpty() ? null : photo);
         }
 
         user = usuarioRepository.save(user);

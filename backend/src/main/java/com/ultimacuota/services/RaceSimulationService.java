@@ -79,8 +79,9 @@ public class RaceSimulationService {
                 h.pos = TRACK_LENGTH;
                 h.finished = true;
                 double overshoot = rawPos - TRACK_LENGTH;
-                double timeCorrection = step > 0 ? overshoot / step : 0;
-                h.finishTime = Math.round((elapsed - timeCorrection) * 100) / 100.0;
+                double timeCorrection = step > 0 ? (overshoot / step) : 0;
+                h.exactFinishTime = elapsed - timeCorrection;
+                h.finishTime = Math.round(h.exactFinishTime * 100.0) / 100.0;
                 finishedThisTick.add(h);
             } else {
                 h.pos = rawPos;
@@ -88,7 +89,7 @@ public class RaceSimulationService {
         }
 
         if (!finishedThisTick.isEmpty()) {
-            finishedThisTick.sort(Comparator.comparingDouble(h -> h.finishTime));
+            finishedThisTick.sort(Comparator.comparingDouble(h -> h.exactFinishTime));
             state.finishOrder.addAll(finishedThisTick);
         }
 
@@ -97,6 +98,21 @@ public class RaceSimulationService {
                         (double) Math.round((h.pos / TRACK_LENGTH) * FINISH_PX)));
 
         Map<Long, Double> snapshot = new HashMap<>(state.positions);
+
+        List<SimHorse> sortedLive = new ArrayList<>(state.horses);
+        sortedLive.sort((a, b) -> {
+            if (a.finished && b.finished) {
+                return Double.compare(a.exactFinishTime, b.exactFinishTime);
+            }
+            if (a.finished) return -1;
+            if (b.finished) return 1;
+            return Double.compare(b.pos, a.pos);
+        });
+
+        Map<Long, Integer> rankings = new HashMap<>();
+        for (int i = 0; i < sortedLive.size(); i++) {
+            rankings.put(sortedLive.get(i).caballoId, i + 1);
+        }
 
         if (state.finishOrder.size() == state.horses.size()) {
             state.running = false;
@@ -110,13 +126,13 @@ public class RaceSimulationService {
                 Map<String, Object> r = new HashMap<>();
                 r.put("caballo_id", h.caballoId);
                 r.put("posicion", idx + 1);
-                r.put("tiempo", new BigDecimal(String.format("%.2f", h.finishTime)));
+                r.put("tiempo", new BigDecimal(String.format(java.util.Locale.US, "%.2f", h.finishTime)));
                 results.add(r);
             }
-            return new TickResult(snapshot, (long) elapsed, results);
+            return new TickResult(snapshot, rankings, (long) elapsed, results);
         }
 
-        return new TickResult(snapshot, (long) elapsed, null);
+        return new TickResult(snapshot, rankings, (long) elapsed, null);
     }
 
     public Map<Long, Double> getPositions(Long raceId) {
@@ -212,6 +228,7 @@ public class RaceSimulationService {
         public final int corazon;
         public double pos;
         public boolean finished;
+        public double exactFinishTime;
         public double finishTime;
 
         public SimHorse(Long caballoId, int velocidad, int resistencia, int corazon) {
@@ -224,11 +241,13 @@ public class RaceSimulationService {
 
     public static class TickResult {
         public final Map<Long, Double> positions;
+        public final Map<Long, Integer> rankings;
         public final long elapsed;
         public final List<Map<String, Object>> results;
 
-        public TickResult(Map<Long, Double> positions, long elapsed, List<Map<String, Object>> results) {
+        public TickResult(Map<Long, Double> positions, Map<Long, Integer> rankings, long elapsed, List<Map<String, Object>> results) {
             this.positions = positions;
+            this.rankings = rankings;
             this.elapsed = elapsed;
             this.results = results;
         }

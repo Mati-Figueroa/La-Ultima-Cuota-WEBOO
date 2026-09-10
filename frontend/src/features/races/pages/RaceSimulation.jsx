@@ -12,6 +12,7 @@ function RaceSimulation() {
   const showToast = useToast();
   const [race, setRace] = useState(null);
   const [positions, setPositions] = useState({});
+  const [rankings, setRankings] = useState({});
   const [finished, setFinished] = useState(false);
   const [results, setResults] = useState([]);
   const socketRef = useRef(null);
@@ -36,27 +37,57 @@ function RaceSimulation() {
   useEffect(() => { fetchRace(); }, [fetchRace]);
 
   useEffect(() => {
-    const socketUrl = process.env.REACT_APP_SOCKET_URL || process.env.REACT_APP_API_URL || `http://${window.location.hostname}:4000`;
+    const envUrl = process.env.REACT_APP_SOCKET_URL;
+    const socketUrl = (envUrl && !envUrl.includes('localhost'))
+      ? envUrl
+      : `http://${window.location.hostname || 'localhost'}:9092`;
+
     const socket = io(socketUrl, { transports: ['websocket', 'polling'] });
     socketRef.current = socket;
     socket.emit('join_race', Number(id));
+
     socket.on('race_positions', (data) => {
-      if (data.carrera_id === Number(id)) { setPositions(data.positions); }
+      if (data.carrera_id === Number(id)) {
+        if (data.positions) setPositions(data.positions);
+        if (data.rankings) setRankings(data.rankings);
+      }
     });
+
     socket.on('race_started', (data) => {
-      if (data.carrera_id === Number(id)) { setFinished(false); fetchRace(); }
+      if (data.carrera_id === Number(id)) {
+        setFinished(false);
+        setResults([]);
+        fetchRace();
+      }
     });
+
+    socket.on('race_finished', async (data) => {
+      if (data.carrera_id === Number(id)) {
+        setFinished(true);
+        if (data.results && data.results.length > 0) {
+          setResults(data.results);
+        } else {
+          try {
+            const resResponse = await api.get(`/api/races/${id}/results`);
+            if (resResponse.data.success) setResults(resResponse.data.data.results);
+          } catch {}
+        }
+        fetchRace();
+      }
+    });
+
     return () => {
       socket.emit('leave_race', Number(id));
       socket.off('race_positions');
       socket.off('race_started');
+      socket.off('race_finished');
       socket.disconnect();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   useEffect(() => {
-    if (race?.estado !== 'en_curso' || finished) return;
+    if (finished) return;
     const check = setInterval(async () => {
       try {
         const response = await api.get(`/api/races/${id}`);
@@ -70,7 +101,7 @@ function RaceSimulation() {
     }, 2000);
     return () => clearInterval(check);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [race, id, finished]);
+  }, [id, finished]);
 
   const getHorseName = (caballoId) => {
     const insc = race?.inscripciones?.find((i) => i.caballo_id === caballoId);
@@ -98,7 +129,7 @@ function RaceSimulation() {
             </Badge>
           </div>
 
-          <RaceTrack inscriptions={race?.inscripciones || []} positions={positions} />
+          <RaceTrack inscriptions={race?.inscripciones || []} positions={positions} rankings={rankings} />
         </Card.Body>
       </Card>
 

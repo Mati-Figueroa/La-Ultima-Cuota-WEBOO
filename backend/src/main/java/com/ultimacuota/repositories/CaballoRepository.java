@@ -36,7 +36,7 @@ public interface CaballoRepository extends JpaRepository<Caballo, Long> {
     int removeFromSale(@Param("id") Long id, @Param("propietarioId") Long propietarioId);
 
     @Modifying
-    @Query("UPDATE Caballo c SET c.propietario.id = :newOwnerId, c.enVenta = false, c.precioVenta = NULL WHERE c.id = :id")
+    @Query(value = "UPDATE caballos SET propietario_id = :newOwnerId, en_venta = false, precio_venta = NULL WHERE id = :id", nativeQuery = true)
     int transfer(@Param("id") Long id, @Param("newOwnerId") Long newOwnerId);
 
     @Modifying

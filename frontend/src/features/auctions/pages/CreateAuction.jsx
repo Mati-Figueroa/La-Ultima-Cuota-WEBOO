@@ -104,7 +104,7 @@ function CreateAuction() {
                       <option value="">Seleccionar caballo...</option>
                       {myHorses.map((h) => (
                         <option key={h.id} value={h.id}>
-                          {h.nombre} — V:{h.velocidad || '?'} / R:{h.resistencia || '?'} / C:{h.corazon || '?'} — F:{h.fatiga}%
+                          {h.nombre} — Winrate: {h.carreras_totales > 0 ? ((h.victorias / h.carreras_totales) * 100).toFixed(0) : 0}% — Fatiga: {h.fatiga}%
                         </option>
                       ))}
                     </Form.Select>

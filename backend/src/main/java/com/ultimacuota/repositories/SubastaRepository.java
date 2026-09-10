@@ -27,11 +27,11 @@ public interface SubastaRepository extends JpaRepository<Subasta, Long> {
     List<Subasta> findActiveAuctions();
 
     @Modifying
-    @Query("UPDATE Subasta s SET s.estado = :estado WHERE s.id = :id")
+    @Query(value = "UPDATE subastas SET estado = :estado WHERE id = :id", nativeQuery = true)
     int updateEstado(@Param("id") Long id, @Param("estado") String estado);
 
     @Modifying
-    @Query("UPDATE Subasta s SET s.estado = 'finalizada', s.ganador.id = :ganadorId WHERE s.id = :id")
+    @Query(value = "UPDATE subastas SET estado = 'finalizada', ganador_id = :ganadorId WHERE id = :id", nativeQuery = true)
     int finalizeWithWinner(@Param("id") Long id, @Param("ganadorId") Long ganadorId);
 
     @Query("SELECT CASE WHEN COUNT(s) > 0 THEN true ELSE false END FROM Subasta s " +

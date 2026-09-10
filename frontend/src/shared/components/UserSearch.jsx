@@ -33,10 +33,11 @@ function UserSearch() {
           placeholder="Buscar usuarios..."
           value={query}
           onChange={handleSearch}
+          className="text-white placeholder-white"
           style={{
-            backgroundColor: 'transparent',
+            backgroundColor: 'rgba(255,255,255,0.15)',
             borderColor: 'rgba(255,255,255,0.3)',
-            color: '#fff',
+            color: '#ffffff',
             borderRadius: '0 8px 8px 0',
           }}
         />
@@ -59,14 +60,14 @@ function UserSearch() {
                   style={{
                     width: '32px',
                     height: '32px',
-                    backgroundColor: user.profilePhoto ? 'transparent' : 'rgba(21, 189, 15, 0.1)',
+                    backgroundColor: (user.profile_photo || user.profilePhoto) ? 'transparent' : 'rgba(21, 189, 15, 0.1)',
                     border: '1px solid var(--color-primary)',
                     overflow: 'hidden',
                     flexShrink: 0,
                   }}
                 >
-                  {user.profilePhoto ? (
-                    <img src={user.profilePhoto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  {user.profile_photo || user.profilePhoto ? (
+                    <img src={user.profile_photo || user.profilePhoto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
                     <i className="bi bi-person-fill" style={{ fontSize: '0.9rem', color: 'var(--color-primary)' }}></i>
                   )}

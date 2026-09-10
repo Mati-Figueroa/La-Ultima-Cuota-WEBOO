@@ -6,6 +6,7 @@ import com.ultimacuota.exceptions.InsufficientBalanceException;
 import com.ultimacuota.exceptions.ResourceNotFoundException;
 import com.ultimacuota.models.*;
 import com.ultimacuota.repositories.*;
+import com.corundumstudio.socketio.SocketIOServer;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.Query;
@@ -30,6 +31,12 @@ public class AuctionService {
     private final UsuarioRepository usuarioRepository;
     private final TransaccionSaldoRepository transaccionRepository;
     private final InscripcionRepository inscripcionRepository;
+
+    private SocketIOServer socketIOServer;
+
+    public void setSocketIOServer(SocketIOServer server) {
+        this.socketIOServer = server;
+    }
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -161,99 +168,131 @@ public class AuctionService {
                     String.format("Tu puja debe ser mayor al precio actual ($%,.0f CC)", currentPrice));
         }
 
+        // Previous highest bid before this placement
+        Optional<Puja> previousHighestBidOpt = pujaRepository.findHighestBid(auctionId);
+
+        // Lock user balance check
         Query saldoQuery = entityManager.createNativeQuery(
                 "SELECT saldo FROM usuarios WHERE id = :id FOR UPDATE");
         saldoQuery.setParameter("id", userId);
         Object saldoResult = saldoQuery.getSingleResult();
-        BigDecimal userSaldo = new BigDecimal(saldoResult.toString());
+        BigDecimal currentSaldo = new BigDecimal(saldoResult.toString());
 
-        if (userSaldo.compareTo(request.getMonto()) < 0) {
+        Optional<Puja> userExistingBidOpt = pujaRepository.findBySubastaIdAndUsuarioIdOrderByMontoDesc(auctionId, userId);
+        BigDecimal previousUserBidAmount = userExistingBidOpt.map(Puja::getMonto).orElse(BigDecimal.ZERO);
+        BigDecimal effectiveUserSaldo = currentSaldo.add(previousUserBidAmount);
+
+        if (effectiveUserSaldo.compareTo(request.getMonto()) < 0) {
             throw new InsufficientBalanceException(
                     String.format("Saldo insuficiente. Necesitas $%,.0f CC, tienes $%,.0f CC",
-                            request.getMonto(), userSaldo));
+                            request.getMonto(), currentSaldo));
         }
 
-        // Refund previous bidder if exists
-        Optional<Puja> existingBidOpt = pujaRepository.findBySubastaIdAndUsuarioIdOrderByMontoDesc(auctionId, userId);
-        if (existingBidOpt.isPresent()) {
-            Puja existingBid = existingBidOpt.get();
-            // Refund the previous bid
-            Usuario prevBidder = usuarioRepository.getReferenceById(userId);
-            prevBidder.setSaldo(prevBidder.getSaldo().add(existingBid.getMonto()));
-            usuarioRepository.save(prevBidder);
-
-            TransaccionSaldo refundTx = TransaccionSaldo.builder()
-                    .usuario(prevBidder)
-                    .tipo("ajuste_admin")
-                    .monto(existingBid.getMonto())
-                    .saldoResultante(prevBidder.getSaldo())
-                    .referenciaTabla("subastas")
-                    .referenciaId(auctionId)
-                    .build();
-            transaccionRepository.save(refundTx);
-
-            // Refund ALL other outbid users
-            List<Puja> allBids = pujaRepository.findBySubastaIdOrderByMontoDescFechaAsc(auctionId);
-            for (Puja bid : allBids) {
-                if (!bid.getUsuario().getId().equals(userId) && bid.getMonto().compareTo(request.getMonto()) < 0) {
-                    Usuario outbidUser = usuarioRepository.getReferenceById(bid.getUsuario().getId());
-                    outbidUser.setSaldo(outbidUser.getSaldo().add(bid.getMonto()));
+        // Refund previous outbid highest bidder if it was another user
+        if (previousHighestBidOpt.isPresent()) {
+            Puja prevHighestBid = previousHighestBidOpt.get();
+            if (!prevHighestBid.getUsuario().getId().equals(userId)) {
+                Usuario outbidUser = usuarioRepository.findById(prevHighestBid.getUsuario().getId()).orElse(null);
+                if (outbidUser != null) {
+                    outbidUser.setSaldo(outbidUser.getSaldo().add(prevHighestBid.getMonto()));
                     usuarioRepository.save(outbidUser);
 
                     TransaccionSaldo outbidRefund = TransaccionSaldo.builder()
                             .usuario(outbidUser)
                             .tipo("ajuste_admin")
-                            .monto(bid.getMonto())
+                            .monto(prevHighestBid.getMonto())
                             .saldoResultante(outbidUser.getSaldo())
                             .referenciaTabla("subastas")
                             .referenciaId(auctionId)
                             .build();
                     transaccionRepository.save(outbidRefund);
+
+                    log.info("[Auction] Usuario {} superó la puja de usuario {}. Reembolsados ${} a usuario {}",
+                            userId, outbidUser.getId(), prevHighestBid.getMonto(), outbidUser.getId());
                 }
             }
         }
 
-        // Deduct new bid amount
-        Usuario bidder = usuarioRepository.getReferenceById(userId);
-        bidder.setSaldo(bidder.getSaldo().subtract(request.getMonto()));
+        // Deduct balance for bidder
+        Usuario bidder = usuarioRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
+        BigDecimal newSaldo = effectiveUserSaldo.subtract(request.getMonto());
+        bidder.setSaldo(newSaldo);
         usuarioRepository.save(bidder);
 
-        // Delete previous bid from this user (unique constraint: subasta_id + usuario_id)
-        existingBidOpt.ifPresent(pujaRepository::delete);
-
-        // Create new bid
-        Puja bid = Puja.builder()
-                .subasta(auction)
-                .usuario(bidder)
-                .monto(request.getMonto())
-                .fecha(LocalDateTime.now())
-                .build();
-        bid = pujaRepository.save(bid);
-
+        BigDecimal deltaDeduction = request.getMonto().subtract(previousUserBidAmount);
         TransaccionSaldo bidTx = TransaccionSaldo.builder()
                 .usuario(bidder)
                 .tipo("puja_subasta")
-                .monto(request.getMonto().negate())
-                .saldoResultante(bidder.getSaldo())
+                .monto(deltaDeduction.negate())
+                .saldoResultante(newSaldo)
                 .referenciaTabla("subastas")
                 .referenciaId(auctionId)
                 .build();
         transaccionRepository.save(bidTx);
 
+        // Update or insert Puja record safely without Hibernate unique key collision
+        Puja bid;
+        if (userExistingBidOpt.isPresent()) {
+            bid = userExistingBidOpt.get();
+            bid.setMonto(request.getMonto());
+            bid.setFecha(LocalDateTime.now());
+            bid = pujaRepository.saveAndFlush(bid);
+        } else {
+            bid = Puja.builder()
+                    .subasta(auction)
+                    .usuario(bidder)
+                    .monto(request.getMonto())
+                    .fecha(LocalDateTime.now())
+                    .build();
+            bid = pujaRepository.saveAndFlush(bid);
+        }
+
+        boolean reserveReached = auction.getPrecioReserva() != null &&
+                request.getMonto().compareTo(auction.getPrecioReserva()) >= 0;
+
+        if (reserveReached) {
+            log.info("[Auction] Subasta #{} alcanzó el precio de reserva con puja ${}. Finalizando transacción...",
+                    auctionId, request.getMonto());
+            finalizeAuction(auction);
+        }
+
+        if (socketIOServer != null) {
+            Map<String, Object> bidEvt = new HashMap<>();
+            bidEvt.put("subasta_id", auctionId);
+            bidEvt.put("puja", toBidMap(bid));
+            bidEvt.put("precio_actual", request.getMonto());
+            bidEvt.put("finalizada", reserveReached);
+            socketIOServer.getRoomOperations("auction_" + auctionId).sendEvent("new_bid", bidEvt);
+            socketIOServer.getRoomOperations("auction_" + auctionId).sendEvent("auction_bid", bidEvt);
+            socketIOServer.getBroadcastOperations().sendEvent("new_bid", bidEvt);
+        }
+
         Map<String, Object> result = new HashMap<>();
         result.put("puja", toBidMap(bid));
         result.put("saldo", bidder.getSaldo());
         result.put("precio_actual", request.getMonto());
+        result.put("finalizada", reserveReached);
         return result;
     }
 
     @Transactional
     public void finalizeAuction(Subasta auction) {
+        if ("finalizada".equals(auction.getEstado()) || "cancelada".equals(auction.getEstado())) {
+            return;
+        }
+
         Optional<Puja> highestBidOpt = pujaRepository.findHighestBid(auction.getId());
 
         if (highestBidOpt.isEmpty()) {
-            // No bids - just close the auction
             subastaRepository.updateEstado(auction.getId(), "finalizada");
+            if (socketIOServer != null) {
+                Map<String, Object> endEvt = new HashMap<>();
+                endEvt.put("subasta_id", auction.getId());
+                endEvt.put("estado", "finalizada");
+                socketIOServer.getRoomOperations("auction_" + auction.getId()).sendEvent("auction_ended", endEvt);
+                socketIOServer.getBroadcastOperations().sendEvent("auction_ended", endEvt);
+            }
             log.info("[Auction] Subasta #{} finalizada sin pujas", auction.getId());
             return;
         }
@@ -261,9 +300,7 @@ public class AuctionService {
         Puja highestBid = highestBidOpt.get();
         BigDecimal winningAmount = highestBid.getMonto();
 
-        // Check reserve price
         if (auction.getPrecioReserva() != null && winningAmount.compareTo(auction.getPrecioReserva()) < 0) {
-            // Reserve not met - refund winner, cancel auction
             Usuario winner = usuarioRepository.getReferenceById(highestBid.getUsuario().getId());
             winner.setSaldo(winner.getSaldo().add(winningAmount));
             usuarioRepository.save(winner);
@@ -279,22 +316,68 @@ public class AuctionService {
             transaccionRepository.save(refundTx);
 
             subastaRepository.updateEstado(auction.getId(), "cancelada");
+            if (socketIOServer != null) {
+                Map<String, Object> endEvt = new HashMap<>();
+                endEvt.put("subasta_id", auction.getId());
+                endEvt.put("estado", "cancelada");
+                socketIOServer.getRoomOperations("auction_" + auction.getId()).sendEvent("auction_ended", endEvt);
+                socketIOServer.getBroadcastOperations().sendEvent("auction_ended", endEvt);
+            }
             log.info("[Auction] Subasta #{} cancelada - reserva no alcanzada", auction.getId());
             return;
         }
 
-        // Transfer horse to winner
-        caballoRepository.transfer(auction.getCaballo().getId(), highestBid.getUsuario().getId());
+        Usuario winner = highestBid.getUsuario();
+
+        // Transfer horse to winner and remove from market/auction
+        Caballo horse = caballoRepository.findById(auction.getCaballo().getId()).orElse(null);
+        if (horse != null) {
+            horse.setPropietario(winner);
+            horse.setEnVenta(false);
+            horse.setPrecioVenta(null);
+            caballoRepository.save(horse);
+            log.info("[Auction] Caballo #{} transferido a ganador {}", horse.getId(), winner.getUsername());
+        }
+
+        // Credit coins to seller
+        Usuario seller = usuarioRepository.findById(auction.getVendedor().getId()).orElse(null);
+        if (seller != null) {
+            seller.setSaldo(seller.getSaldo().add(winningAmount));
+            usuarioRepository.save(seller);
+
+            TransaccionSaldo sellerTx = TransaccionSaldo.builder()
+                    .usuario(seller)
+                    .tipo("venta_caballo")
+                    .monto(winningAmount)
+                    .saldoResultante(seller.getSaldo())
+                    .referenciaTabla("subastas")
+                    .referenciaId(auction.getId())
+                    .build();
+            transaccionRepository.save(sellerTx);
+            log.info("[Auction] Vendedor {} acreditado con ${} CC", seller.getUsername(), winningAmount);
+        }
 
         // Mark winning bid
         pujaRepository.clearWinners(auction.getId());
         pujaRepository.markAsWinner(highestBid.getId());
 
-        // Finalize auction
-        subastaRepository.finalizeWithWinner(auction.getId(), highestBid.getUsuario().getId());
+        // Finalize auction with winner
+        auction.setEstado("finalizada");
+        auction.setGanador(winner);
+        subastaRepository.save(auction);
 
-        log.info("[Auction] Subasta #{} finalizada - ganador: {} (${},.0f CC)",
-                auction.getId(), highestBid.getUsuario().getUsername(), winningAmount);
+        if (socketIOServer != null) {
+            Map<String, Object> endEvt = new HashMap<>();
+            endEvt.put("subasta_id", auction.getId());
+            endEvt.put("estado", "finalizada");
+            endEvt.put("ganador_id", winner.getId());
+            endEvt.put("ganador_username", winner.getUsername());
+            socketIOServer.getRoomOperations("auction_" + auction.getId()).sendEvent("auction_ended", endEvt);
+            socketIOServer.getBroadcastOperations().sendEvent("auction_ended", endEvt);
+        }
+
+        log.info("[Auction] Subasta #{} finalizada - vendedor acreditado: {} (${}), ganador: {}",
+                auction.getId(), seller != null ? seller.getUsername() : "N/A", winningAmount, winner.getUsername());
     }
 
     public BigDecimal getCurrentPrice(Subasta auction) {
@@ -308,14 +391,17 @@ public class AuctionService {
         map.put("caballo_id", s.getCaballo().getId());
         map.put("caballo_nombre", s.getCaballo().getNombre());
         map.put("caballo_edad", s.getCaballo().getEdad());
-        map.put("caballo_velocidad", s.getCaballo().getVelocidad());
-        map.put("caballo_resistencia", s.getCaballo().getResistencia());
-        map.put("caballo_corazon", s.getCaballo().getCorazon());
+        double wr = s.getCaballo().getCarrerasTotales() != null && s.getCaballo().getCarrerasTotales() > 0
+                ? Math.round((double) s.getCaballo().getVictorias() / s.getCaballo().getCarrerasTotales() * 100.0)
+                : 0.0;
+        map.put("caballo_winrate", wr);
         map.put("caballo_fatiga", s.getCaballo().getFatiga());
         map.put("caballo_carreras", s.getCaballo().getCarrerasTotales());
         map.put("caballo_victorias", s.getCaballo().getVictorias());
         map.put("vendedor_id", s.getVendedor().getId());
         map.put("vendedor_username", s.getVendedor().getUsername());
+        map.put("vendedor_photo", s.getVendedor().getProfilePhoto());
+        map.put("vendedor_profile_photo", s.getVendedor().getProfilePhoto());
         map.put("precio_inicial", s.getPrecioInicial());
         map.put("precio_reserva", s.getPrecioReserva());
         map.put("precio_actual", getCurrentPrice(s));
@@ -337,9 +423,49 @@ public class AuctionService {
         map.put("subasta_id", p.getSubasta().getId());
         map.put("usuario_id", p.getUsuario().getId());
         map.put("usuario_username", p.getUsuario().getUsername());
+        map.put("usuario_photo", p.getUsuario().getProfilePhoto());
+        map.put("usuario_profile_photo", p.getUsuario().getProfilePhoto());
         map.put("monto", p.getMonto());
         map.put("fecha", p.getFecha());
         map.put("es_ganadora", p.getEsGanadora());
         return map;
+    }
+
+    @Transactional
+    public void healIncompleteAuctions() {
+        try {
+            List<Subasta> auctions = subastaRepository.findAll();
+            for (Subasta s : auctions) {
+                if ("finalizada".equals(s.getEstado()) && s.getGanador() == null) {
+                    Optional<Puja> highestBidOpt = pujaRepository.findHighestBid(s.getId());
+                    if (highestBidOpt.isPresent()) {
+                        Puja highestBid = highestBidOpt.get();
+                        if (s.getPrecioReserva() == null || highestBid.getMonto().compareTo(s.getPrecioReserva()) >= 0) {
+                            Usuario winner = highestBid.getUsuario();
+                            Caballo horse = s.getCaballo();
+                            if (horse != null && !winner.getId().equals(horse.getPropietario() != null ? horse.getPropietario().getId() : null)) {
+                                horse.setPropietario(winner);
+                                horse.setEnVenta(false);
+                                horse.setPrecioVenta(null);
+                                caballoRepository.save(horse);
+                                log.info("[AuctionHealing] Caballo #{} transferido a ganador {}", horse.getId(), winner.getUsername());
+                            }
+                            Usuario seller = s.getVendedor();
+                            if (seller != null) {
+                                seller.setSaldo(seller.getSaldo().add(highestBid.getMonto()));
+                                usuarioRepository.save(seller);
+                            }
+                            highestBid.setEsGanadora(true);
+                            pujaRepository.save(highestBid);
+                            s.setGanador(winner);
+                            subastaRepository.save(s);
+                            log.info("[AuctionHealing] Reparada subasta #{} asignando ganador {}", s.getId(), winner.getUsername());
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("[AuctionHealing] Error al reparar subastas: {}", e.getMessage());
+        }
     }
 }

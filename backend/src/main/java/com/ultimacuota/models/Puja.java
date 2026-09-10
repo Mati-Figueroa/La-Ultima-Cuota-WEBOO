@@ -36,8 +36,4 @@ public class Puja {
     @Builder.Default
     @Column(name = "es_ganadora")
     private Boolean esGanadora = false;
-
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
 }

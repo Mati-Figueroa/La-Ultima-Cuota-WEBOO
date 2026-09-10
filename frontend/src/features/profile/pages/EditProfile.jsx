@@ -7,7 +7,7 @@ import api from '../../../shared/services/api';
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 function EditProfile() {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const showToast = useToast();
   const fileInputRef = useRef(null);
   const [username, setUsername] = useState('');
@@ -19,8 +19,8 @@ function EditProfile() {
   useEffect(() => {
     if (user) {
       setUsername(user.username || '');
-      setProfilePhoto(user.profilePhoto || '');
-      setPreview(user.profilePhoto || '');
+      setProfilePhoto(user.profile_photo || user.profilePhoto || '');
+      setPreview(user.profile_photo || user.profilePhoto || '');
     }
   }, [user]);
 
@@ -62,14 +62,13 @@ function EditProfile() {
     try {
       const response = await api.patch('/api/auth/me', {
         username: username.trim(),
-        profilePhoto: profilePhoto || null,
+        profilePhoto: profilePhoto || '',
       });
       if (response.data.success) {
         showToast('Perfil actualizado', 'success');
         setSuccess('Perfil actualizado correctamente');
         const updatedUser = response.data.data.user;
-        localStorage.setItem('user', JSON.stringify(updatedUser));
-        window.location.reload();
+        updateUser(updatedUser);
       }
     } catch (err) {
       showToast(err.response?.data?.error || 'Error al actualizar perfil', 'error');

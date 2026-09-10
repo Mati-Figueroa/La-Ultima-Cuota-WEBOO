@@ -72,8 +72,13 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
+  const updateUser = useCallback((userData) => {
+    setUser(userData);
+    localStorage.setItem('user', JSON.stringify(userData));
+  }, []);
+
   const updateUserSaldo = useCallback((newSaldo) => {
-    setUser((prev) => prev ? { ...prev, saldo: newSaldo } : prev);
+    setUser((prev) => (prev ? { ...prev, saldo: newSaldo } : prev));
   }, []);
 
   const value = {
@@ -83,6 +88,7 @@ export function AuthProvider({ children }) {
     login,
     register,
     logout,
+    updateUser,
     updateUserSaldo,
     isAuthenticated: !!token && !!user,
   };

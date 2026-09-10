@@ -24,72 +24,105 @@ function Simulador() {
   const [running, setRunning] = useState(false);
   const [finished, setFinished] = useState(false);
   const [positions, setPositions] = useState({});
+  const [liveRanks, setLiveRanks] = useState({});
   const [results, setResults] = useState([]);
   const intervalRef = useRef(null);
-  const countdownRef = useRef(null);
+  const rawPositionsRef = useRef({});
+  const finishOrderRef = useRef([]);
 
   useEffect(() => {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
-      if (countdownRef.current) clearInterval(countdownRef.current);
     };
   }, []);
 
   const selectedHorses = MOCK_HORSES.slice(0, horseCount);
   const trackHeight = selectedHorses.length * LANE_HEIGHT + 16;
 
-  const initPositions = () => {
-    const init = {};
-    selectedHorses.forEach((_, idx) => {
-      init[idx] = 0;
-    });
-    return init;
-  };
-
   const startRace = () => {
     setRunning(true);
     setFinished(false);
     setResults([]);
-    setPositions(initPositions());
+    setLiveRanks({});
+    finishOrderRef.current = [];
+
+    const initRaw = {};
+    const initVisual = {};
+    selectedHorses.forEach((_, idx) => {
+      initRaw[idx] = 0;
+      initVisual[idx] = 0;
+    });
+    rawPositionsRef.current = initRaw;
+    setPositions(initVisual);
 
     intervalRef.current = setInterval(() => {
-      setPositions((prev) => {
-        const next = { ...prev };
-        Object.keys(next).forEach((key) => {
-          const progress = next[key];
-          if (progress >= TRACK_WIDTH - HORSE_WIDTH - 20) return;
-          const speed = Math.random() * 10 + 3;
-          next[key] = Math.min(progress + speed * 2, TRACK_WIDTH - HORSE_WIDTH - 20);
-        });
-        return next;
-      });
-    }, 800);
+      const currentRaw = { ...rawPositionsRef.current };
+      const nextRaw = { ...currentRaw };
+      const nextVisual = {};
+      const newlyFinished = [];
 
-    countdownRef.current = setInterval(() => {
-      setPositions((prevPos) => {
-        const allDone = Object.values(prevPos).every((p) => p >= TRACK_WIDTH - HORSE_WIDTH - 20);
-        if (allDone) {
-          clearInterval(countdownRef.current);
-          clearInterval(intervalRef.current);
-          setRunning(false);
-          setFinished(true);
-          const sorted = Object.entries(prevPos)
-            .map(([id, pos]) => ({ id: Number(id), pos }))
-            .sort((a, b) => b.pos - a.pos);
-          setResults(sorted);
+      selectedHorses.forEach((_, idx) => {
+        const cur = currentRaw[idx] || 0;
+        if (cur < FINISH_PX) {
+          const speed = Math.random() * 25 + 10;
+          const newPos = cur + speed;
+          nextRaw[idx] = newPos;
+          if (newPos >= FINISH_PX) {
+            newlyFinished.push({ idx, overflow: newPos - FINISH_PX });
+          }
         }
-        return prevPos;
       });
-    }, 500);
+
+      newlyFinished.sort((a, b) => b.overflow - a.overflow);
+      newlyFinished.forEach((item) => {
+        if (!finishOrderRef.current.includes(item.idx)) {
+          finishOrderRef.current.push(item.idx);
+        }
+      });
+
+      selectedHorses.forEach((_, idx) => {
+        nextVisual[idx] = Math.min(nextRaw[idx], FINISH_PX);
+      });
+
+      rawPositionsRef.current = nextRaw;
+      setPositions(nextVisual);
+
+      // Compute live ranks
+      const sortedLive = selectedHorses.map((_, idx) => idx).sort((a, b) => {
+        const finishedA = finishOrderRef.current.indexOf(a);
+        const finishedB = finishOrderRef.current.indexOf(b);
+        if (finishedA !== -1 && finishedB !== -1) return finishedA - finishedB;
+        if (finishedA !== -1) return -1;
+        if (finishedB !== -1) return 1;
+        return nextRaw[b] - nextRaw[a];
+      });
+
+      const ranks = {};
+      sortedLive.forEach((horseIdx, rankIdx) => {
+        ranks[horseIdx] = rankIdx + 1;
+      });
+      setLiveRanks(ranks);
+
+      const allDone = selectedHorses.every((_, idx) => nextRaw[idx] >= FINISH_PX);
+      if (allDone) {
+        clearInterval(intervalRef.current);
+        setRunning(false);
+        setFinished(true);
+        const res = finishOrderRef.current.map((horseIdx) => ({ id: horseIdx }));
+        setResults(res);
+      }
+    }, 400);
   };
 
   const resetRace = () => {
     if (intervalRef.current) clearInterval(intervalRef.current);
-    if (countdownRef.current) clearInterval(countdownRef.current);
     setRunning(false);
     setFinished(false);
     setResults([]);
     setPositions({});
+    setLiveRanks({});
+    finishOrderRef.current = [];
+    rawPositionsRef.current = {};
   };
 
   const getColor = (idx) => LANE_COLORS[idx % LANE_COLORS.length];
@@ -245,6 +278,7 @@ function Simulador() {
 
             {selectedHorses.map((name, idx) => {
               const pos = positions[idx] || 0;
+              const rank = liveRanks[idx];
               const laneTop = idx * LANE_HEIGHT + 8 + (LANE_HEIGHT - 28) / 2;
               const color = getColor(idx);
               const finished = pos >= FINISH_PX;
@@ -258,10 +292,26 @@ function Simulador() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '5px',
-                    transition: 'left 0.8s ease-out',
+                    transition: 'left 0.4s ease-out',
                     zIndex: 2,
                   }}
                 >
+                  {rank && (
+                    <span
+                      style={{
+                        fontSize: '0.7rem',
+                        fontWeight: 'bold',
+                        backgroundColor: rank === 1 ? '#FFD700' : rank === 2 ? '#C0C0C0' : rank === 3 ? '#CD7F32' : '#6c757d',
+                        color: rank <= 3 ? '#000' : '#fff',
+                        padding: '1px 5px',
+                        borderRadius: '10px',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                        flexShrink: 0,
+                      }}
+                    >
+                      #{rank}
+                    </span>
+                  )}
                   <span
                     className="fw-bold"
                     style={{

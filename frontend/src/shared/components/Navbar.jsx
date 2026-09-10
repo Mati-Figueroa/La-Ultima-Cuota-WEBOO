@@ -6,6 +6,8 @@ import DailyRewardButton from './DailyRewardButton';
 import UserSearch from './UserSearch';
 import api from '../services/api';
 
+import { useActiveLiveRace } from '../context/SocketContext';
+
 const ROUTE_LABELS = {
   '/dashboard': 'Inicio',
   '/establo': 'Establo',
@@ -15,13 +17,17 @@ const ROUTE_LABELS = {
   '/gacha': 'Gacha',
   '/historial': 'Historial',
   '/simulador': 'Simulador',
+  '/usuarios': 'Usuarios',
 };
 
 function NavigationBar() {
   const { user, isAuthenticated, logout } = useAuth();
+  const activeRaceContext = useActiveLiveRace();
+  const activeLiveRaceId = activeRaceContext?.activeLiveRaceId;
   const navigate = useNavigate();
   const location = useLocation();
   const [wins, setWins] = useState([]);
+  const [currentRunningRaceId, setCurrentRunningRaceId] = useState(null);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -30,6 +36,21 @@ function NavigationBar() {
           if (res.data.success) setWins(res.data.data.wins);
         })
         .catch(() => {});
+
+      const checkRunningRace = () => {
+        api.get('/api/races?estado=en_curso')
+          .then((res) => {
+            if (res.data.success && res.data.data.races?.length > 0) {
+              setCurrentRunningRaceId(res.data.data.races[0].id);
+            } else {
+              setCurrentRunningRaceId(null);
+            }
+          })
+          .catch(() => {});
+      };
+      checkRunningRace();
+      const interval = setInterval(checkRunningRace, 5000);
+      return () => clearInterval(interval);
     }
   }, [isAuthenticated]);
 
@@ -101,6 +122,17 @@ function NavigationBar() {
           <Nav className="ms-auto align-items-center gap-2">
             {isAuthenticated && user && (
               <>
+                {(currentRunningRaceId || activeLiveRaceId) && (
+                  <Link
+                    to={`/carrera/${currentRunningRaceId || activeLiveRaceId}/simulacion`}
+                    className="btn btn-success btn-sm fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
+                    style={{ borderRadius: '20px', fontSize: '0.82rem', padding: '4px 12px' }}
+                  >
+                    <span className="spinner-grow spinner-grow-sm text-light me-1" role="status" style={{ width: '8px', height: '8px' }}></span>
+                    Ver en vivo
+                  </Link>
+                )}
+
                 <UserSearch />
 
                 <span
@@ -158,9 +190,9 @@ function NavigationBar() {
                     id="user-dropdown"
                     style={{ borderColor: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', gap: '6px' }}
                   >
-                    {user.profilePhoto ? (
+                    {user.profile_photo || user.profilePhoto ? (
                       <img
-                        src={user.profilePhoto}
+                        src={user.profile_photo || user.profilePhoto}
                         alt=""
                         style={{ width: '22px', height: '22px', borderRadius: '50%', objectFit: 'cover' }}
                       />
@@ -171,9 +203,9 @@ function NavigationBar() {
                   </Dropdown.Toggle>
                   <Dropdown.Menu>
                     <Dropdown.ItemText className="fw-medium d-flex align-items-center gap-2">
-                      {user.profilePhoto ? (
+                      {user.profile_photo || user.profilePhoto ? (
                         <img
-                          src={user.profilePhoto}
+                          src={user.profile_photo || user.profilePhoto}
                           alt=""
                           style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }}
                         />

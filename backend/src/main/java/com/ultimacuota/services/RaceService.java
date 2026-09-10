@@ -94,6 +94,10 @@ public class RaceService {
 
     @Transactional
     public Map<String, Object> inscribe(Long raceId, InscribeRequest request, Long userId) {
+        if (request == null || request.getCaballoId() == null) {
+            throw new IllegalArgumentException("Debe seleccionar un caballo válido");
+        }
+
         Carrera carrera = carreraRepository.findById(raceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Carrera no encontrada"));
 
@@ -242,10 +246,6 @@ public class RaceService {
         map.put("edad", i.getCaballo().getEdad());
         map.put("fatiga", i.getCaballo().getFatiga());
         map.put("carreras_totales", i.getCaballo().getCarrerasTotales());
-        map.put("victorias", i.getCaballo().getVictorias());
-        map.put("velocidad", i.getCaballo().getVelocidad());
-        map.put("resistencia", i.getCaballo().getResistencia());
-        map.put("corazon", i.getCaballo().getCorazon());
         map.put("es_bot", i.getCaballo().getEsBot());
         map.put("numero_carril", i.getNumeroCarril());
         map.put("fecha_inscripcion", i.getFechaInscripcion());

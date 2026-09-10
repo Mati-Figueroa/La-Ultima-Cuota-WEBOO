@@ -133,10 +133,6 @@ function AuctionList() {
                     </p>
                     <div className="mb-3" style={{ fontSize: '0.85rem' }}>
                       <div className="d-flex justify-content-between mb-1">
-                        <span className="text-muted">Vel / Res / Cor</span>
-                        <span className="font-mono fw-bold">{auction.caballo_velocidad}/{auction.caballo_resistencia}/{auction.caballo_corazon}</span>
-                      </div>
-                      <div className="d-flex justify-content-between mb-1">
                         <span className="text-muted">Winrate</span>
                         <span className="font-mono fw-bold">
                           {auction.caballo_carreras > 0 ? `${((auction.caballo_victorias / auction.caballo_carreras) * 100).toFixed(0)}%` : '0%'}

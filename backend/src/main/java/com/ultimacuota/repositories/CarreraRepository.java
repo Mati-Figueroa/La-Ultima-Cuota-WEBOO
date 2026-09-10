@@ -30,6 +30,9 @@ public interface CarreraRepository extends JpaRepository<Carrera, Long> {
     @Query("DELETE FROM Carrera c WHERE c.estado = 'programada' AND c.tieneInteraccionHumana = false")
     int deleteAllBotOnlyProgrammedRaces();
 
+    @Query("SELECT COUNT(c) FROM Carrera c WHERE c.estado = 'programada' AND c.fechaProgramada > :now")
+    long countUpcomingProgrammed(@Param("now") LocalDateTime now);
+
     @Query("SELECT COUNT(c) FROM Carrera c WHERE c.estado = 'programada'")
     long countProgrammed();
 }

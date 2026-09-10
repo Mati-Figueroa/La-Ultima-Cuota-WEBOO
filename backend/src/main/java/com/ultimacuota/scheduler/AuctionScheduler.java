@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import jakarta.annotation.PostConstruct;
 import jakarta.transaction.Transactional;
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -29,7 +30,12 @@ public class AuctionScheduler {
         this.socketIOServer = server;
     }
 
-    @Scheduled(fixedRate = 30000, initialDelay = 10000)
+    @PostConstruct
+    public void init() {
+        auctionService.healIncompleteAuctions();
+    }
+
+    @Scheduled(fixedRate = 1000, initialDelay = 2000)
     @Transactional
     public void checkExpiredAuctions() {
         try {

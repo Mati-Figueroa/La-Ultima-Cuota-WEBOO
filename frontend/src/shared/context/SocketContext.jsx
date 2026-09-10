@@ -9,18 +9,28 @@ export function useSocket() {
   return useContext(SocketContext);
 }
 
+export const ActiveLiveRaceContext = createContext(null);
+
+export function useActiveLiveRace() {
+  return useContext(ActiveLiveRaceContext);
+}
+
 export function SocketProvider({ children }) {
   const { user } = useAuth();
   const showToast = useToast();
   const socketRef = useRef(null);
+  const [activeLiveRaceId, setActiveLiveRaceId] = React.useState(null);
 
   useEffect(() => {
     if (!user) return;
 
     const connect = () => {
       if (socketRef.current?.connected) return;
-      const socketUrl = process.env.REACT_APP_SOCKET_URL || process.env.REACT_APP_API_URL || `http://${window.location.hostname}:4000`;
-      const socket = io(socketUrl, {
+      const envUrl = process.env.REACT_APP_SOCKET_URL;
+      const socketHost = (envUrl && !envUrl.includes('localhost'))
+        ? envUrl
+        : `http://${window.location.hostname || 'localhost'}:9092`;
+      const socket = io(socketHost, {
         transports: ['websocket', 'polling'],
         reconnection: true,
         reconnectionDelay: 1000,
@@ -28,9 +38,17 @@ export function SocketProvider({ children }) {
       });
       socketRef.current = socket;
 
+      socket.on('race_starting_soon', (data) => {
+        if (data?.carrera_id) {
+          setActiveLiveRaceId(data.carrera_id);
+          showToast(`¡La carrera #${data.carrera_id} comenzará en 10 segundos!`, 'warning');
+        }
+      });
+
       socket.on('race_started', (data) => {
         if (data?.carrera_id) {
-          showToast(`Carrera #${data.carrera_id} ha comenzado!`, 'info');
+          setActiveLiveRaceId(data.carrera_id);
+          showToast(`¡Carrera #${data.carrera_id} en vivo ahora!`, 'info');
         }
       });
     };
@@ -47,6 +65,7 @@ export function SocketProvider({ children }) {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibility);
       if (socketRef.current) {
+        socketRef.current.off('race_starting_soon');
         socketRef.current.off('race_started');
         socketRef.current.disconnect();
         socketRef.current = null;
@@ -57,7 +76,9 @@ export function SocketProvider({ children }) {
 
   return (
     <SocketContext.Provider value={socketRef}>
-      {children}
+      <ActiveLiveRaceContext.Provider value={{ activeLiveRaceId, setActiveLiveRaceId }}>
+        {children}
+      </ActiveLiveRaceContext.Provider>
     </SocketContext.Provider>
   );
 }

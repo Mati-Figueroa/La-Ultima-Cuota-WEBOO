@@ -80,12 +80,15 @@ public class RaceLifecycleManager {
                     .orElse(BigDecimal.valueOf(30));
 
             for (Carrera race : toFinish) {
-                if (simulationService.isRunning(race.getId())) continue;
+                if (!simulationService.isRunning(race.getId())) {
+                    processedRaceIds.add(race.getId());
+                    simulationService.startSimulation(race.getId());
+                    log.info("[Lifecycle] Reanudada simulación para carrera en curso #{}", race.getId());
+                    continue;
+                }
 
                 long elapsed = java.time.Duration.between(race.getFechaInicioReal(), now).getSeconds();
                 if (elapsed < raceDuration.longValue()) continue;
-
-                settleRace(race.getId(), null);
             }
         } catch (Exception e) {
             log.error("[Lifecycle] Error en transiciones: {}", e.getMessage());
@@ -141,6 +144,15 @@ public class RaceLifecycleManager {
             race.setEstado("finalizada");
             race.setFechaFinReal(LocalDateTime.now());
             carreraRepository.save(race);
+
+            if (socketIOServer != null) {
+                Map<String, Object> finishEvt = new HashMap<>();
+                finishEvt.put("carrera_id", raceId);
+                finishEvt.put("results", results);
+                socketIOServer.getRoomOperations("race_" + raceId).sendEvent("race_finished", finishEvt);
+                socketIOServer.getBroadcastOperations().sendEvent("race_finished", finishEvt);
+            }
+
             log.info("[Lifecycle] Carrera #{} finalizada", raceId);
         } catch (Exception e) {
             log.error("[Lifecycle] Error liquidando carrera #{}: {}", raceId, e.getMessage());

@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
 
 -- Idempotent column addition for profile_photo (safe if column already exists)
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS profile_photo TEXT NULL;
+ALTER TABLE usuarios ALTER COLUMN profile_photo TYPE TEXT;
 
 CREATE TABLE IF NOT EXISTS caballos (
     id SERIAL PRIMARY KEY,
@@ -123,5 +124,12 @@ CREATE TABLE IF NOT EXISTS pujas (
     monto NUMERIC(12,2) NOT NULL,
     fecha TIMESTAMP DEFAULT NOW(),
     es_ganadora BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT NOW(),
     UNIQUE (subasta_id, usuario_id)
 );
+
+-- Migrations for existing deployments
+ALTER TABLE transacciones_saldo DROP CONSTRAINT IF EXISTS transacciones_saldo_tipo_check;
+ALTER TABLE transacciones_saldo ALTER COLUMN referencia_id TYPE BIGINT;
+ALTER TABLE pujas ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
+

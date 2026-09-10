@@ -23,9 +23,6 @@ public class CaballoService {
         map.put("id", horse.getId());
         map.put("nombre", horse.getNombre());
         map.put("edad", horse.getEdad());
-        map.put("velocidad", horse.getVelocidad());
-        map.put("resistencia", horse.getResistencia());
-        map.put("corazon", horse.getCorazon());
         map.put("fatiga", horse.getFatiga());
         map.put("carreras_totales", horse.getCarrerasTotales());
         map.put("victorias", horse.getVictorias());
