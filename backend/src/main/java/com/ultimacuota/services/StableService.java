@@ -23,13 +23,23 @@ public class StableService {
     private final CaballoRepository caballoRepository;
     private final InscripcionRepository inscripcionRepository;
     private final ApuestaRepository apuestaRepository;
+    private final com.ultimacuota.repositories.JineteRepository jineteRepository;
 
     @PersistenceContext
     private EntityManager entityManager;
 
     public List<Map<String, Object>> getMyHorses(Long userId) {
+        Map<Long, com.ultimacuota.models.Jinete> jinetesPorCaballo = new HashMap<>();
+        for (com.ultimacuota.models.Jinete j : jineteRepository.findByEmpleadorId(userId)) {
+            if (j.getCaballo() != null) jinetesPorCaballo.put(j.getCaballo().getId(), j);
+        }
         return caballoRepository.findByPropietarioIdOrderByCreatedAtDesc(userId)
-                .stream().map(this::toHorseMap).collect(Collectors.toList());
+                .stream().map(c -> {
+                    Map<String, Object> map = toHorseMap(c);
+                    com.ultimacuota.models.Jinete j = jinetesPorCaballo.get(c.getId());
+                    map.put("jinete", j != null ? JockeyService.resumen(j) : null);
+                    return map;
+                }).collect(Collectors.toList());
     }
 
     public List<Map<String, Object>> getHorseHistory(Long horseId, Long userId) {
@@ -151,6 +161,7 @@ public class StableService {
         map.put("en_venta", c.getEnVenta());
         map.put("precio_venta", c.getPrecioVenta());
         map.put("created_at", c.getCreatedAt());
+        HorseConditionService.agregarCondicion(map, c);
         return map;
     }
 }

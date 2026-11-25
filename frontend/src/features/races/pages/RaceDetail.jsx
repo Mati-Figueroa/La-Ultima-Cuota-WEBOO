@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Container, Row, Col, Card, Button, Badge, Form, Alert, ProgressBar } from 'react-bootstrap';
 import { useToast } from '../../../shared/context/ToastContext';
 import { useAuth } from '../../../shared/context/AuthContext';
+import { EventFeed } from '../../../shared/components/RaceEvents';
 import api from '../../../shared/services/api';
 
 function RaceDetail() {
@@ -47,7 +48,7 @@ function RaceDetail() {
       const response = await api.get('/api/stable');
       if (response.data.success) {
         const eligible = response.data.data.horses.filter(
-          (h) => h.fatiga < 80 && !h.en_venta
+          (h) => h.fatiga < 80 && !h.en_venta && !h.lesion && (h.felicidad ?? 70) >= 10
         );
         setMyHorses(eligible);
       }
@@ -277,7 +278,10 @@ function RaceDetail() {
                               </div>
                             </td>
                             {race.estado === 'finalizada' && results.length > 0 && (
-                              <td className="font-mono">{result?.tiempo_final ? `${result.tiempo_final}s` : '---'}</td>
+                              <td className="font-mono">
+                                {result?.abandono ? <Badge bg="dark">No terminó</Badge>
+                                  : result?.tiempo_final ? `${result.tiempo_final}s` : '---'}
+                              </td>
                             )}
                           </tr>
                         );
@@ -328,6 +332,12 @@ function RaceDetail() {
                 </div>
               </Card.Body>
             </Card>
+          )}
+
+          {race.eventos?.length > 0 && (
+            <div className="mb-4">
+              <EventFeed eventos={race.eventos} titulo="Eventos de la carrera" />
+            </div>
           )}
 
           {race.estado === 'finalizada' && results.length > 0 && (
@@ -388,7 +398,7 @@ function RaceDetail() {
                       <option value="">Seleccionar caballo...</option>
                       {myHorses.map((h) => (
                         <option key={h.id} value={h.id}>
-                          {h.nombre} (F: {h.fatiga}%)
+                          {h.nombre} (F: {h.fatiga}% · Felicidad {h.felicidad ?? 70}{h.jinete ? ` · ${h.jinete.nombre}` : ''})
                         </option>
                       ))}
                     </Form.Select>

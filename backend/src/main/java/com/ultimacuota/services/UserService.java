@@ -17,6 +17,7 @@ public class UserService {
 
     private final UsuarioRepository usuarioRepository;
     private final CaballoRepository caballoRepository;
+    private final com.ultimacuota.repositories.JineteRepository jineteRepository;
 
     public Map<String, Object> getUserProfile(Long userId) {
         Usuario user = usuarioRepository.findById(userId)
@@ -29,7 +30,15 @@ public class UserService {
         map.put("profilePhoto", user.getProfilePhoto());
         map.put("created_at", user.getCreatedAt());
 
+        List<com.ultimacuota.models.Jinete> jinetes = jineteRepository.findByEmpleadorId(userId);
+        Map<Long, com.ultimacuota.models.Jinete> jinetesPorCaballo = new HashMap<>();
+        for (com.ultimacuota.models.Jinete j : jinetes) {
+            if (j.getCaballo() != null) jinetesPorCaballo.put(j.getCaballo().getId(), j);
+        }
+        map.put("jinetes", jinetes.stream().map(JockeyService::resumen).collect(Collectors.toList()));
+
         List<Caballo> horses = caballoRepository.findByPropietarioIdOrderByCreatedAtDesc(userId);
+        map.put("victorias_totales", horses.stream().mapToInt(h -> h.getVictorias() != null ? h.getVictorias() : 0).sum());
         List<Map<String, Object>> horsesData = horses.stream().map(h -> {
             Map<String, Object> hm = new HashMap<>();
             hm.put("id", h.getId());
@@ -45,6 +54,9 @@ public class UserService {
             hm.put("posicion_promedio", h.getPosicionPromedio());
             hm.put("en_venta", h.getEnVenta());
             hm.put("precio_venta", h.getPrecioVenta());
+            HorseConditionService.agregarCondicion(hm, h);
+            com.ultimacuota.models.Jinete j = jinetesPorCaballo.get(h.getId());
+            hm.put("jinete", j != null ? JockeyService.resumen(j) : null);
             return hm;
         }).collect(Collectors.toList());
 

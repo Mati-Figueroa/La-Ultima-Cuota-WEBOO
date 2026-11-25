@@ -30,4 +30,7 @@ public interface InscripcionRepository extends JpaRepository<Inscripcion, Long> 
 
     @Query("SELECT COUNT(i) > 0 FROM Inscripcion i WHERE i.caballo.id = :caballoId AND i.carrera.estado <> 'finalizada'")
     boolean isInscribedInActiveRace(@Param("caballoId") Long caballoId);
+
+    @Query("SELECT COUNT(i) > 0 FROM Inscripcion i WHERE i.caballo.id = :caballoId AND i.carrera.estado = 'en_curso'")
+    boolean isCorriendoAhora(@Param("caballoId") Long caballoId);
 }

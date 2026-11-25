@@ -24,6 +24,9 @@ import AuctionList from '../features/auctions/pages/AuctionList';
 import AuctionDetail from '../features/auctions/pages/AuctionDetail';
 import CreateAuction from '../features/auctions/pages/CreateAuction';
 import UserList from '../features/profile/pages/UserList';
+import Shop from '../features/shop/pages/Shop';
+import JockeyList from '../features/jockeys/pages/JockeyList';
+import JockeyDetail from '../features/jockeys/pages/JockeyDetail';
 
 function App() {
   return (
@@ -195,6 +198,21 @@ function App() {
                 </PrivateRoute>
               }
             />
+            {[
+              ['/tienda', <Shop />],
+              ['/jinetes', <JockeyList />],
+              ['/jinete/:id', <JockeyDetail />],
+            ].map(([path, page]) => (
+              <Route
+                key={path}
+                path={path}
+                element={
+                  <PrivateRoute>
+                    <DashboardLayout>{page}</DashboardLayout>
+                  </PrivateRoute>
+                }
+              />
+            ))}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           </SocketProvider>

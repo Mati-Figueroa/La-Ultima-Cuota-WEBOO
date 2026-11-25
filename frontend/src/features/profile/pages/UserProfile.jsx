@@ -1,14 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Container, Row, Col, Card, Badge, ProgressBar } from 'react-bootstrap';
+import { Container, Row, Col, Card, Badge, ProgressBar, Button } from 'react-bootstrap';
 import { useToast } from '../../../shared/context/ToastContext';
+import { useAuth } from '../../../shared/context/AuthContext';
+import HorseCondition from '../../../shared/components/HorseCondition';
+import GiftModal from '../../gifts/components/GiftModal';
 import api from '../../../shared/services/api';
 
 function UserProfile() {
   const { id } = useParams();
   const showToast = useToast();
+  const { user: yo } = useAuth();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showGift, setShowGift] = useState(false);
+  const esPropio = yo && user && Number(yo.id) === Number(user.id);
 
   const fetchUser = useCallback(async () => {
     try {
@@ -73,11 +79,59 @@ function UserProfile() {
                 Miembro desde {user.created_at ? new Date(user.created_at).toLocaleDateString('es-CL', { month: 'long', year: 'numeric' }) : 'recientemente'}
               </p>
 
-              <div className="d-flex justify-content-center gap-2">
+              <div className="d-flex justify-content-around mb-3" style={{ fontSize: '0.85rem' }}>
+                <div>
+                  <div className="font-mono fw-bold" style={{ fontSize: '1.2rem' }}>{user.caballos?.length || 0}</div>
+                  <div className="text-muted">Caballos</div>
+                </div>
+                <div>
+                  <div className="font-mono fw-bold" style={{ fontSize: '1.2rem' }} data-testid="victorias-totales">{user.victorias_totales ?? 0}</div>
+                  <div className="text-muted">Victorias</div>
+                </div>
+                <div>
+                  <div className="font-mono fw-bold" style={{ fontSize: '1.2rem' }}>{user.jinetes?.length || 0}</div>
+                  <div className="text-muted">Jinetes</div>
+                </div>
+              </div>
+
+              <div className="d-flex justify-content-center gap-2 flex-wrap">
+                {esPropio ? (
+                  <Link to="/editar-perfil" className="btn btn-outline-primary btn-sm" style={{ borderRadius: '8px' }}>
+                    <i className="bi bi-pencil me-1"></i>Editar perfil
+                  </Link>
+                ) : (
+                  <Button variant="primary" size="sm" style={{ borderRadius: '8px' }} onClick={() => setShowGift(true)}
+                          data-testid="btn-enviar-regalo">
+                    <i className="bi bi-gift me-1"></i>Enviar regalo
+                  </Button>
+                )}
                 <Link to="/subastas" className="btn btn-outline-primary btn-sm" style={{ borderRadius: '8px' }}>
                   <i className="bi bi-hammer me-1"></i>Ver Subastas
                 </Link>
               </div>
+            </Card.Body>
+          </Card>
+
+          <Card className="border-0 shadow-sm mt-4">
+            <Card.Body className="p-4">
+              <h6 className="font-heading fw-bold mb-3">
+                <i className="bi bi-person-badge me-2" style={{ color: 'var(--color-primary)' }}></i>
+                Jinetes ({user.jinetes?.length || 0})
+              </h6>
+              {!user.jinetes || user.jinetes.length === 0 ? (
+                <p className="text-muted mb-0" style={{ fontSize: '0.85rem' }}>No tiene jinetes contratados.</p>
+              ) : (
+                <div className="d-flex flex-column gap-2" style={{ fontSize: '0.85rem' }}>
+                  {user.jinetes.map((j) => (
+                    <div key={j.id} className="d-flex justify-content-between">
+                      <Link to={`/jinete/${j.id}`} className="text-decoration-none">{j.nombre}</Link>
+                      <span className="text-muted">
+                        hab. {j.habilidad}{j.caballo_nombre ? ` · ${j.caballo_nombre}` : ''}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </Card.Body>
           </Card>
         </Col>
@@ -133,6 +187,11 @@ function UserProfile() {
                                 <span className="font-mono" style={{ fontSize: '0.75rem' }}>{horse.fatiga}%</span>
                               </div>
                             </div>
+                            <HorseCondition compact felicidad={horse.felicidad} lesion={horse.lesion} lesionHasta={horse.lesion_hasta} />
+                            <div className="d-flex justify-content-between">
+                              <span className="text-muted">Jinete:</span>
+                              <span className="fw-semibold">{horse.jinete ? horse.jinete.nombre : '—'}</span>
+                            </div>
                           </div>
                         </Card.Body>
                       </Card>
@@ -144,6 +203,9 @@ function UserProfile() {
           </Card>
         </Col>
       </Row>
+      {!esPropio && (
+        <GiftModal show={showGift} onHide={() => setShowGift(false)} destinatario={user} />
+      )}
     </Container>
   );
 }

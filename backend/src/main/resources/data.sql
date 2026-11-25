@@ -31,3 +31,38 @@ INSERT INTO caballos (nombre, edad, velocidad, resistencia, corazon, es_bot) VAL
     ('Tralka del Cielo', 4, 80, 55, 62, true),
     ('Ruetru Tormenta', 5, 63, 78, 57, true)
 ON CONFLICT DO NOTHING;
+
+INSERT INTO configuracion (clave, valor, descripcion) VALUES
+    ('lesion_leve_minutos', '60', 'Minutos para que una lesión leve sane sola'),
+    ('lesion_moderada_minutos', '360', 'Minutos para que una lesión moderada sane sola'),
+    ('max_jinetes_usuario', '5', 'Máximo de jinetes contratados por usuario'),
+    ('felicidad_minima_carrera', '10', 'Felicidad mínima para inscribir un caballo')
+ON CONFLICT (clave) DO NOTHING;
+
+INSERT INTO jinetes (nombre, habilidad, peso, especialidad, precio_contratacion) VALUES
+    ('Pedro "Látigo" Fuentealba', 92, 52, NULL, 3000),
+    ('Camila Huenchullán', 85, 50, 'lluvia', 2500),
+    ('Rodrigo Catrileo', 80, 54, 'barro', 2200),
+    ('Javiera Millapán', 76, 49, 'sequia', 1900),
+    ('Tomás Ñancupil', 72, 55, NULL, 1600),
+    ('Valentina Quilodrán', 68, 51, 'lluvia', 1400),
+    ('Matías Curihual', 63, 56, 'barro', 1150),
+    ('Fernanda Antiñir', 58, 50, NULL, 950),
+    ('Ignacio Painemal', 52, 57, 'sequia', 800),
+    ('Antonia Llancaqueo', 47, 53, NULL, 650),
+    ('Benjamín Calfucura', 41, 58, 'barro', 500),
+    ('Sofía Huaiquimil', 35, 52, NULL, 400)
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO items_tienda (codigo, nombre, descripcion, categoria, calidad, precio, cura_nivel, reduce_fatiga, aumenta_felicidad) VALUES
+    ('vendaje', 'Vendaje', 'Cura una lesión leve.', 'curacion', 'basica', 150, 1, 0, 0),
+    ('kit_veterinario', 'Kit veterinario', 'Cura lesiones leves y moderadas.', 'curacion', 'estandar', 450, 2, 0, 5),
+    ('cirugia_equina', 'Cirugía equina', 'Cura cualquier lesión, incluso las graves.', 'curacion', 'premium', 1200, 3, 0, 10),
+    ('heno_comun', 'Heno común', 'Comida básica: algo de descanso y ánimo.', 'comida', 'basica', 60, 0, 10, 3),
+    ('avena', 'Avena', 'Comida nutritiva para recuperar energía.', 'comida', 'estandar', 140, 0, 20, 8),
+    ('alfalfa_premium', 'Alfalfa premium', 'La mejor comida: recupera mucha energía y alegra al caballo.', 'comida', 'premium', 320, 0, 35, 15),
+    ('zanahorias', 'Zanahorias', 'Un premio que sube la felicidad.', 'cuidado', 'basica', 80, 0, 0, 10),
+    ('terron_azucar', 'Terrón de azúcar', 'Un capricho dulce: mucha felicidad.', 'cuidado', 'estandar', 200, 0, 0, 20),
+    ('cepillado', 'Cepillado profesional', 'Sesión de cuidado completo.', 'cuidado', 'premium', 380, 0, 10, 30),
+    ('suero_electrolitico', 'Suero electrolítico', 'Rehidrata y baja mucho la fatiga.', 'cuidado', 'premium', 300, 0, 40, 0)
+ON CONFLICT (codigo) DO NOTHING;

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Container, Row, Col, Card, Badge, Button, ButtonGroup } from 'react-bootstrap';
+import { Container, Row, Col, Card, Badge, Button, ButtonGroup, Nav } from 'react-bootstrap';
+import { useSearchParams } from 'react-router-dom';
 import { useToast } from '../../../shared/context/ToastContext';
+import GiftHistory from '../../gifts/components/GiftHistory';
 import api from '../../../shared/services/api';
 
 const STATUS_LABELS = {
@@ -19,6 +21,9 @@ const STATUS_VARIANTS = {
 
 function History() {
   const showToast = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const vista = searchParams.get('vista') === 'regalos' ? 'regalos' : 'apuestas';
+  const setVista = (v) => setSearchParams(v === 'regalos' ? { vista: 'regalos' } : {});
   const [bets, setBets] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -60,12 +65,18 @@ function History() {
       <Row className="mb-4">
         <Col>
           <h2 className="font-heading fw-bold mb-1" style={{ color: 'var(--color-text-dark)' }}>
-            <i className="bi bi-clock-history me-2" style={{ color: 'var(--color-primary)' }}></i>Historial de Apuestas
+            <i className="bi bi-clock-history me-2" style={{ color: 'var(--color-primary)' }}></i>Historial
           </h2>
-          <p className="text-muted mb-0">Tus apuestas y estadísticas</p>
+          <p className="text-muted mb-0">Tus apuestas, estadísticas y regalos</p>
         </Col>
       </Row>
 
+      <Nav variant="tabs" className="mb-4" activeKey={vista} onSelect={(k) => setVista(k)}>
+        <Nav.Item><Nav.Link eventKey="apuestas"><i className="bi bi-cash-coin me-1"></i>Apuestas</Nav.Link></Nav.Item>
+        <Nav.Item><Nav.Link eventKey="regalos"><i className="bi bi-gift me-1"></i>Regalos</Nav.Link></Nav.Item>
+      </Nav>
+
+      {vista === 'regalos' ? <GiftHistory /> : (<>
       {stats && (
         <Row className="g-3 mb-4">
           <Col xs={6} md={3}>
@@ -214,6 +225,7 @@ function History() {
           )}
         </>
       )}
+      </>)}
     </Container>
   );
 }

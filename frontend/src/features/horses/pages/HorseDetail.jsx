@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Container, Row, Col, Card, Badge, ProgressBar, Button } from 'react-bootstrap';
 import { useToast } from '../../../shared/context/ToastContext';
+import HorseCondition from '../../../shared/components/HorseCondition';
 import api from '../../../shared/services/api';
 
 function HorseDetail() {
@@ -98,6 +99,21 @@ function HorseDetail() {
                     style={{ height: '8px' }}
                   />
                 </div>
+                {!horse.es_bot && (
+                  <>
+                    <HorseCondition felicidad={horse.felicidad} lesion={horse.lesion} lesionHasta={horse.lesion_hasta} />
+                    <div className="d-flex justify-content-between" style={{ fontSize: '0.85rem' }}>
+                      <span className="text-muted">Jinete</span>
+                      {horse.jinete ? (
+                        <Link to={`/jinete/${horse.jinete.id}`} className="fw-semibold text-decoration-none">
+                          <i className="bi bi-person-badge me-1"></i>{horse.jinete.nombre} (hab. {horse.jinete.habilidad})
+                        </Link>
+                      ) : (
+                        <span className="text-muted">Sin jinete</span>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             </Card.Body>
           </Card>

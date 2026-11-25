@@ -133,3 +133,84 @@ ALTER TABLE transacciones_saldo DROP CONSTRAINT IF EXISTS transacciones_saldo_ti
 ALTER TABLE transacciones_saldo ALTER COLUMN referencia_id TYPE BIGINT;
 ALTER TABLE pujas ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
 
+
+-- =============================================
+-- Condición del caballo: felicidad y lesiones
+-- =============================================
+ALTER TABLE caballos ADD COLUMN IF NOT EXISTS felicidad INTEGER DEFAULT 70;
+ALTER TABLE caballos ADD COLUMN IF NOT EXISTS lesion VARCHAR(20) NULL;
+ALTER TABLE caballos ADD COLUMN IF NOT EXISTS lesion_hasta TIMESTAMP NULL;
+UPDATE caballos SET felicidad = 70 WHERE felicidad IS NULL;
+ALTER TABLE caballos DROP CONSTRAINT IF EXISTS caballos_lesion_check;
+ALTER TABLE caballos ADD CONSTRAINT caballos_lesion_check CHECK (lesion IS NULL OR lesion IN ('leve', 'moderada', 'grave'));
+
+-- =============================================
+-- Jinetes
+-- =============================================
+CREATE TABLE IF NOT EXISTS jinetes (
+    id SERIAL PRIMARY KEY,
+    nombre VARCHAR(100) UNIQUE NOT NULL,
+    habilidad INTEGER NOT NULL,
+    peso INTEGER NOT NULL,
+    experiencia INTEGER DEFAULT 0,
+    especialidad VARCHAR(20) NULL CHECK (especialidad IS NULL OR especialidad IN ('lluvia', 'barro', 'sequia')),
+    precio_contratacion NUMERIC(12,2) NOT NULL,
+    empleador_id INTEGER NULL REFERENCES usuarios(id) ON DELETE SET NULL,
+    caballo_id INTEGER NULL UNIQUE REFERENCES caballos(id) ON DELETE SET NULL,
+    fecha_contratacion TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- =============================================
+-- Tienda e inventario
+-- =============================================
+CREATE TABLE IF NOT EXISTS items_tienda (
+    id SERIAL PRIMARY KEY,
+    codigo VARCHAR(50) UNIQUE NOT NULL,
+    nombre VARCHAR(100) NOT NULL,
+    descripcion TEXT NULL,
+    categoria VARCHAR(20) NOT NULL CHECK (categoria IN ('curacion', 'comida', 'cuidado')),
+    calidad VARCHAR(20) NOT NULL CHECK (calidad IN ('basica', 'estandar', 'premium')),
+    precio NUMERIC(12,2) NOT NULL,
+    cura_nivel INTEGER DEFAULT 0,
+    reduce_fatiga INTEGER DEFAULT 0,
+    aumenta_felicidad INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS inventario (
+    id SERIAL PRIMARY KEY,
+    usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    item_id INTEGER NOT NULL REFERENCES items_tienda(id) ON DELETE CASCADE,
+    cantidad INTEGER NOT NULL DEFAULT 0 CHECK (cantidad >= 0),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE (usuario_id, item_id)
+);
+
+-- =============================================
+-- Eventos aleatorios de carrera
+-- =============================================
+CREATE TABLE IF NOT EXISTS eventos_carrera (
+    id SERIAL PRIMARY KEY,
+    carrera_id INTEGER NOT NULL REFERENCES carreras(id) ON DELETE CASCADE,
+    tipo VARCHAR(30) NOT NULL,
+    caballo_id INTEGER NULL REFERENCES caballos(id) ON DELETE SET NULL,
+    segundo INTEGER NOT NULL DEFAULT 0,
+    descripcion VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- =============================================
+-- Regalos entre usuarios
+-- =============================================
+CREATE TABLE IF NOT EXISTS regalos (
+    id SERIAL PRIMARY KEY,
+    remitente_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    destinatario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    monto NUMERIC(12,2) NOT NULL DEFAULT 0,
+    item_id INTEGER NULL REFERENCES items_tienda(id) ON DELETE SET NULL,
+    cantidad INTEGER NOT NULL DEFAULT 0,
+    mensaje VARCHAR(200) NULL,
+    created_at TIMESTAMP DEFAULT NOW()
+);

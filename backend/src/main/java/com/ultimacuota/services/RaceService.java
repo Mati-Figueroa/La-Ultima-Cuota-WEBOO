@@ -29,6 +29,9 @@ public class RaceService {
     private final ApuestaRepository apuestaRepository;
     private final TransaccionSaldoRepository transaccionRepository;
     private final ResultadoCarreraRepository resultadoRepository;
+    private final EventoCarreraRepository eventoCarreraRepository;
+    private final JineteRepository jineteRepository;
+    private final HorseConditionService horseConditionService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -46,7 +49,21 @@ public class RaceService {
         List<Map<String, Object>> inscripciones = inscripcionRepository.findByCarreraIdWithCaballo(id)
                 .stream().map(this::toInscriptionMap).collect(Collectors.toList());
         result.put("inscripciones", inscripciones);
+        result.put("eventos", getEventos(id));
         return result;
+    }
+
+    public List<Map<String, Object>> getEventos(Long carreraId) {
+        return eventoCarreraRepository.findByCarreraIdOrdenados(carreraId).stream().map(e -> {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", e.getId());
+            m.put("tipo", e.getTipo());
+            m.put("segundo", e.getSegundo());
+            m.put("descripcion", e.getDescripcion());
+            m.put("caballo_id", e.getCaballo() != null ? e.getCaballo().getId() : null);
+            m.put("caballo_nombre", e.getCaballo() != null ? e.getCaballo().getNombre() : null);
+            return m;
+        }).collect(Collectors.toList());
     }
 
     public Map<String, Object> getOdds(Long id) {
@@ -98,6 +115,12 @@ public class RaceService {
             throw new IllegalArgumentException("Debe seleccionar un caballo válido");
         }
 
+        // Bloquea la carrera para que el conteo de cupos y la inserción sean atómicos.
+        if (entityManager.createNativeQuery("SELECT id FROM carreras WHERE id = :id FOR UPDATE")
+                .setParameter("id", raceId).getResultList().isEmpty()) {
+            throw new ResourceNotFoundException("Carrera no encontrada");
+        }
+
         Carrera carrera = carreraRepository.findById(raceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Carrera no encontrada"));
 
@@ -115,6 +138,17 @@ public class RaceService {
 
         if (horse.getPropietario() == null || !horse.getPropietario().getId().equals(userId)) {
             throw new ResourceNotFoundException("Caballo no encontrado en tu establo");
+        }
+
+        if (horse.getLesion() != null) {
+            throw new IllegalArgumentException("El caballo tiene una lesión " + horse.getLesion()
+                    + " y no puede competir hasta sanar");
+        }
+
+        int felicidadMinima = horseConditionService.felicidadMinimaParaCorrer();
+        if (horse.getFelicidad() != null && horse.getFelicidad() < felicidadMinima) {
+            throw new IllegalArgumentException("El caballo está demasiado triste para competir (felicidad mínima: "
+                    + felicidadMinima + ")");
         }
 
         if (horse.getFatiga() >= 80) {
@@ -245,6 +279,9 @@ public class RaceService {
         map.put("caballo_nombre", i.getCaballo().getNombre());
         map.put("edad", i.getCaballo().getEdad());
         map.put("fatiga", i.getCaballo().getFatiga());
+        HorseConditionService.agregarCondicion(map, i.getCaballo());
+        map.put("jinete_nombre", Boolean.TRUE.equals(i.getCaballo().getEsBot()) ? null
+                : jineteRepository.findValidoPorCaballo(i.getCaballo().getId()).map(Jinete::getNombre).orElse(null));
         map.put("carreras_totales", i.getCaballo().getCarrerasTotales());
         map.put("es_bot", i.getCaballo().getEsBot());
         map.put("numero_carril", i.getNumeroCarril());
@@ -257,6 +294,7 @@ public class RaceService {
         Map<String, Object> map = new HashMap<>();
         map.put("posicion_final", r.getPosicionFinal());
         map.put("tiempo_final", r.getTiempoFinal());
+        map.put("abandono", r.getTiempoFinal() == null);
         map.put("caballo_id", r.getCaballo().getId());
         map.put("caballo_nombre", r.getCaballo().getNombre());
         map.put("edad", r.getCaballo().getEdad());

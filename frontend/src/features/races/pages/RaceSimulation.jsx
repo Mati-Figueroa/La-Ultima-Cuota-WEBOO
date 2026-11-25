@@ -4,7 +4,11 @@ import { Container, Card, Button, Badge } from 'react-bootstrap';
 import { io } from 'socket.io-client';
 import { useToast } from '../../../shared/context/ToastContext';
 import RaceTrack from '../../../shared/components/RaceTrack';
+import { EventFeed, ClimaBanner, EVENT_META } from '../../../shared/components/RaceEvents';
 import api from '../../../shared/services/api';
+
+const CLIMAS = ['lluvia', 'barro', 'sequia'];
+const claveEvento = (e) => `${e.tipo}|${e.descripcion}`;
 
 function RaceSimulation() {
   const { id } = useParams();
@@ -13,9 +17,22 @@ function RaceSimulation() {
   const [race, setRace] = useState(null);
   const [positions, setPositions] = useState({});
   const [rankings, setRankings] = useState({});
+  const [estados, setEstados] = useState({});
+  const [clima, setClima] = useState(null);
+  const [eventos, setEventos] = useState([]);
   const [finished, setFinished] = useState(false);
   const [results, setResults] = useState([]);
   const socketRef = useRef(null);
+
+  const agregarEventos = useCallback((nuevos) => {
+    if (!nuevos || nuevos.length === 0) return;
+    setEventos((prev) => {
+      const vistos = new Set(prev.map(claveEvento));
+      const sumados = nuevos.filter((e) => !vistos.has(claveEvento(e)));
+      if (sumados.length === 0) return prev;
+      return [...prev, ...sumados].sort((a, b) => (a.segundo ?? 0) - (b.segundo ?? 0));
+    });
+  }, []);
 
   const fetchRace = useCallback(async () => {
     try {
@@ -23,6 +40,7 @@ function RaceSimulation() {
       if (response.data.success) {
         const r = response.data.data.race;
         setRace(r);
+        agregarEventos(r.eventos);
         if (r.estado === 'finalizada') {
           setFinished(true);
           const resResponse = await api.get(`/api/races/${id}/results`);
@@ -32,7 +50,7 @@ function RaceSimulation() {
     } catch {
       showToast('Error al cargar la carrera', 'error');
     }
-  }, [id, showToast]);
+  }, [id, showToast, agregarEventos]);
 
   useEffect(() => { fetchRace(); }, [fetchRace]);
 
@@ -50,7 +68,21 @@ function RaceSimulation() {
       if (data.carrera_id === Number(id)) {
         if (data.positions) setPositions(data.positions);
         if (data.rankings) setRankings(data.rankings);
+        if (data.estados) setEstados(data.estados);
+        if (data.clima) setClima(data.clima);
       }
+    });
+
+    socket.on('race_event', (data) => {
+      if (data.carrera_id === Number(id)) {
+        agregarEventos([data]);
+        const meta = EVENT_META[data.tipo];
+        showToast(`${meta ? meta.icon + ' ' : ''}${data.descripcion}`, 'warning');
+      }
+    });
+
+    socket.on('race_events_snapshot', (data) => {
+      if (data.carrera_id === Number(id)) agregarEventos(data.eventos);
     });
 
     socket.on('race_started', (data) => {
@@ -79,6 +111,8 @@ function RaceSimulation() {
     return () => {
       socket.emit('leave_race', Number(id));
       socket.off('race_positions');
+      socket.off('race_event');
+      socket.off('race_events_snapshot');
       socket.off('race_started');
       socket.off('race_finished');
       socket.disconnect();
@@ -102,6 +136,8 @@ function RaceSimulation() {
     return () => clearInterval(check);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, finished]);
+
+  const climaActual = clima || eventos.find((e) => CLIMAS.includes(e.tipo))?.tipo || null;
 
   const getHorseName = (caballoId) => {
     const insc = race?.inscripciones?.find((i) => i.caballo_id === caballoId);
@@ -129,9 +165,20 @@ function RaceSimulation() {
             </Badge>
           </div>
 
-          <RaceTrack inscriptions={race?.inscripciones || []} positions={positions} rankings={rankings} />
+          <ClimaBanner clima={climaActual} />
+          <RaceTrack
+            inscriptions={race?.inscripciones || []}
+            positions={positions}
+            rankings={rankings}
+            estados={estados}
+            clima={climaActual}
+          />
         </Card.Body>
       </Card>
+
+      <div className="mb-4">
+        <EventFeed eventos={eventos} />
+      </div>
 
       {finished && results.length > 0 && (
         <Card className="border-0 shadow-sm" style={{ borderTop: '4px solid var(--color-secondary)' }}>
@@ -162,6 +209,13 @@ function RaceSimulation() {
                   <span className="fw-semibold" style={{ color: 'var(--color-text-dark)' }}>
                     {getHorseName(r.caballo_id)}
                   </span>
+                  {r.abandono ? (
+                    <Badge bg="dark" className="ms-auto" data-testid="resultado-abandono">No terminó</Badge>
+                  ) : (r.tiempo ?? r.tiempo_final) != null && (
+                    <span className="ms-auto font-mono text-muted" style={{ fontSize: '0.85rem' }}>
+                      {Number(r.tiempo ?? r.tiempo_final).toFixed(2)}s
+                    </span>
+                  )}
                 </div>
               ))}
             </div>

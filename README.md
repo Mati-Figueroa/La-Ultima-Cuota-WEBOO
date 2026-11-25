@@ -52,6 +52,19 @@ docker-compose up --build
 | GET | `/api/history/wins` | Yes | Recent wins |
 | GET | `/api/history/stats` | Yes | Bet stats |
 | GET | `/api/health` | No | Health check |
+| GET | `/api/users/:id` | No | User profile (horses, jockeys, wins) |
+| GET | `/api/jockeys?estado=disponibles\|todos` | No | List jockeys |
+| GET | `/api/jockeys/:id` | No | Jockey detail |
+| GET | `/api/jockeys/mine` | Yes | My jockeys |
+| POST | `/api/jockeys/:id/hire` | Yes | Hire jockey (one-time fee, exclusive) |
+| PATCH | `/api/jockeys/:id/assign` | Yes | Assign to one of my horses (`caballoId`, or null to unassign) |
+| POST | `/api/jockeys/:id/fire` | Yes | Fire jockey (no refund) |
+| GET | `/api/shop/items` | No | Shop catalog |
+| POST | `/api/shop/items/:id/buy` | Yes | Buy item (`cantidad`) |
+| GET | `/api/inventory` | Yes | My inventory |
+| POST | `/api/inventory/:itemId/use` | Yes | Use item on a horse (`caballoId`) |
+| POST | `/api/gifts` | Yes | Send gift (`destinatarioId`, `monto`, optional `itemId`/`cantidad`/`mensaje`) |
+| GET | `/api/gifts?tipo=recibidos\|enviados` | Yes | My gifts |
 
 ## Development
 
@@ -75,3 +88,8 @@ npm start
 - Horse marketplace
 - Daily rewards
 - Bet history and statistics
+- Random race events (rain, mud, drought, lightning, bombs, poisoning, abductions, sudden collapse) — at least one per race
+- Horse happiness and injuries (mild/moderate heal over time, severe needs an item)
+- Jockeys (hire, assign, fire)
+- Shop with healing, food and care items
+- Gifts between users (money and items)

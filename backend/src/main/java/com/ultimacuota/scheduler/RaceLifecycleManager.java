@@ -3,6 +3,7 @@ package com.ultimacuota.scheduler;
 import com.ultimacuota.models.*;
 import com.ultimacuota.repositories.*;
 import com.ultimacuota.services.BetSettlementService;
+import com.ultimacuota.services.HorseConditionService;
 import com.ultimacuota.services.RaceSimulationService;
 import com.corundumstudio.socketio.SocketIOServer;
 import jakarta.persistence.EntityManager;
@@ -30,6 +31,7 @@ public class RaceLifecycleManager {
     private final BetSettlementService betSettlementService;
     private final RaceCreator raceCreator;
     private final RaceSimulationService simulationService;
+    private final HorseConditionService horseConditionService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -128,7 +130,7 @@ public class RaceLifecycleManager {
                         .carrera(race)
                         .caballo(caballo)
                         .posicionFinal((Integer) r.get("posicion"))
-                        .tiempoFinal(new BigDecimal(r.get("tiempo").toString()))
+                        .tiempoFinal(r.get("tiempo") != null ? new BigDecimal(r.get("tiempo").toString()) : null)
                         .build();
                 resultadoRepository.save(resultado);
             }
@@ -140,6 +142,7 @@ public class RaceLifecycleManager {
             }
 
             betSettlementService.settleRace(raceId, results);
+            horseConditionService.aplicarResultadoCarrera(results);
 
             race.setEstado("finalizada");
             race.setFechaFinReal(LocalDateTime.now());

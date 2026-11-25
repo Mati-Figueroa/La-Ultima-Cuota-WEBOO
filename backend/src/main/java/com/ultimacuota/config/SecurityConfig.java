@@ -4,6 +4,7 @@ import com.ultimacuota.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -40,6 +41,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/horses/**").permitAll()
                 .requestMatchers("/api/auctions").permitAll()
                 .requestMatchers("/api/auctions/*").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/jockeys/mine").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/jockeys", "/api/jockeys/*").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/shop/items").permitAll()
                 .requestMatchers("/socket.io/**").permitAll()
                 .anyRequest().authenticated()
             )

@@ -24,6 +24,7 @@ public class MarketService {
     private final CaballoRepository caballoRepository;
     private final UsuarioRepository usuarioRepository;
     private final TransaccionSaldoRepository transaccionRepository;
+    private final JineteRepository jineteRepository;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -68,6 +69,7 @@ public class MarketService {
         usuarioRepository.save(seller);
 
         caballoRepository.transfer(horseId, userId);
+        jineteRepository.desasignarDeCaballo(horseId);
 
         TransaccionSaldo buyerTx = TransaccionSaldo.builder()
                 .usuario(buyer)
@@ -101,6 +103,7 @@ public class MarketService {
         map.put("nombre", c.getNombre());
         map.put("edad", c.getEdad());
         map.put("fatiga", c.getFatiga());
+        HorseConditionService.agregarCondicion(map, c);
         map.put("carreras_totales", c.getCarrerasTotales());
         map.put("victorias", c.getVictorias());
         map.put("posicion_promedio", c.getPosicionPromedio());

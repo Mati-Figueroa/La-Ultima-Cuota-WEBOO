@@ -14,6 +14,7 @@ import java.util.Map;
 public class CaballoService {
 
     private final CaballoRepository caballoRepository;
+    private final com.ultimacuota.repositories.JineteRepository jineteRepository;
 
     public Map<String, Object> getHorseById(Long id) {
         Caballo horse = caballoRepository.findById(id)
@@ -31,6 +32,9 @@ public class CaballoService {
         map.put("precio_venta", horse.getPrecioVenta());
         map.put("es_bot", horse.getEsBot());
         map.put("created_at", horse.getCreatedAt());
+        HorseConditionService.agregarCondicion(map, horse);
+        map.put("jinete", Boolean.TRUE.equals(horse.getEsBot()) ? null
+                : jineteRepository.findValidoPorCaballo(horse.getId()).map(JockeyService::resumen).orElse(null));
 
         if (horse.getPropietario() != null) {
             Map<String, Object> owner = new HashMap<>();

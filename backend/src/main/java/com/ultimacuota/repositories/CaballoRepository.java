@@ -64,4 +64,27 @@ public interface CaballoRepository extends JpaRepository<Caballo, Long> {
            "c.fatiga = LEAST(c.fatiga + 15, 100) " +
            "WHERE c.id = :id")
     void incrementStats(@Param("id") Long id, @Param("wins") int wins, @Param("races") int races, @Param("avgPos") double avgPos);
+
+    @Modifying
+    @Query("UPDATE Caballo c SET c.felicidad = LEAST(GREATEST(COALESCE(c.felicidad, 70) + :delta, 0), 100), " +
+           "c.fatiga = LEAST(COALESCE(c.fatiga, 0) + :fatigaExtra, 100) " +
+           "WHERE c.id = :id AND c.esBot = false")
+    int ajustarCondicionPostCarrera(@Param("id") Long id, @Param("delta") int delta, @Param("fatigaExtra") int fatigaExtra);
+
+    /** Aplica la lesión solo si es más grave que la actual (o el caballo está sano). */
+    @Modifying
+    @Query("UPDATE Caballo c SET c.lesion = :lesion, c.lesionHasta = :hasta " +
+           "WHERE c.id = :id AND c.esBot = false AND (c.lesion IS NULL OR c.lesion IN :menores)")
+    int aplicarLesion(@Param("id") Long id, @Param("lesion") String lesion,
+                      @Param("hasta") java.time.LocalDateTime hasta, @Param("menores") List<String> menores);
+
+    @Modifying
+    @Query("UPDATE Caballo c SET c.lesion = NULL, c.lesionHasta = NULL " +
+           "WHERE c.lesionHasta IS NOT NULL AND c.lesionHasta <= :now")
+    int sanarLesionesVencidas(@Param("now") java.time.LocalDateTime now);
+
+    @Modifying
+    @Query("UPDATE Caballo c SET c.felicidad = GREATEST(c.felicidad - :cantidad, :minimo) " +
+           "WHERE c.esBot = false AND c.propietario IS NOT NULL AND c.felicidad > :minimo")
+    int decaerFelicidad(@Param("cantidad") int cantidad, @Param("minimo") int minimo);
 }

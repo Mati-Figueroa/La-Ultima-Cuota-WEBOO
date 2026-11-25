@@ -10,7 +10,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import com.ultimacuota.support.TestDataCleaner;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -23,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 @ActiveProfiles("test")
+@Import(TestDataCleaner.class)
 public class ConcurrencyTest {
 
     @Autowired
@@ -43,15 +46,14 @@ public class ConcurrencyTest {
     @Autowired
     private ApuestaRepository apuestaRepository;
 
+    @Autowired
+    private TestDataCleaner cleaner;
+
     private Carrera testRace;
 
     @BeforeEach
     void setUp() {
-        apuestaRepository.deleteAll();
-        inscripcionRepository.deleteAll();
-        carreraRepository.deleteAll();
-        caballoRepository.deleteAll();
-        usuarioRepository.deleteAll();
+        cleaner.limpiar();
 
         testRace = Carrera.builder()
                 .nombre("Gran Premio Concurrencia")
@@ -87,6 +89,9 @@ public class ConcurrencyTest {
             Caballo h = Caballo.builder()
                     .nombre("Caballo_" + i)
                     .edad(4)
+                    .velocidad(50)
+                    .resistencia(50)
+                    .corazon(50)
                     .fatiga(0)
                     .propietario(u)
                     .esBot(false)
@@ -141,6 +146,9 @@ public class ConcurrencyTest {
         Caballo h = Caballo.builder()
                 .nombre("CaballoBet")
                 .edad(4)
+                .velocidad(50)
+                .resistencia(50)
+                .corazon(50)
                 .fatiga(0)
                 .propietario(user)
                 .esBot(false)

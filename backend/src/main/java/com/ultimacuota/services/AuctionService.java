@@ -31,6 +31,7 @@ public class AuctionService {
     private final UsuarioRepository usuarioRepository;
     private final TransaccionSaldoRepository transaccionRepository;
     private final InscripcionRepository inscripcionRepository;
+    private final JineteRepository jineteRepository;
 
     private SocketIOServer socketIOServer;
 
@@ -333,6 +334,7 @@ public class AuctionService {
         Caballo horse = caballoRepository.findById(auction.getCaballo().getId()).orElse(null);
         if (horse != null) {
             horse.setPropietario(winner);
+            jineteRepository.desasignarDeCaballo(horse.getId());
             horse.setEnVenta(false);
             horse.setPrecioVenta(null);
             caballoRepository.save(horse);
@@ -445,6 +447,7 @@ public class AuctionService {
                             Caballo horse = s.getCaballo();
                             if (horse != null && !winner.getId().equals(horse.getPropietario() != null ? horse.getPropietario().getId() : null)) {
                                 horse.setPropietario(winner);
+                                jineteRepository.desasignarDeCaballo(horse.getId());
                                 horse.setEnVenta(false);
                                 horse.setPrecioVenta(null);
                                 caballoRepository.save(horse);

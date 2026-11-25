@@ -3,6 +3,7 @@ package com.ultimacuota.config;
 import com.corundumstudio.socketio.SocketIOServer;
 import com.ultimacuota.scheduler.AuctionScheduler;
 import com.ultimacuota.scheduler.RaceLifecycleManager;
+import com.ultimacuota.scheduler.RaceScheduler;
 import com.ultimacuota.services.AuctionService;
 import com.ultimacuota.services.RaceSimulationService;
 import jakarta.annotation.PreDestroy;
@@ -26,7 +27,7 @@ public class SocketIOConfig {
     private SocketIOServer server;
 
     @Bean
-    public SocketIOServer socketIOServer(RaceLifecycleManager raceLifecycleManager, RaceSimulationService simulationService, AuctionScheduler auctionScheduler, AuctionService auctionService) {
+    public SocketIOServer socketIOServer(RaceLifecycleManager raceLifecycleManager, RaceScheduler raceScheduler, RaceSimulationService simulationService, AuctionScheduler auctionScheduler, AuctionService auctionService) {
         com.corundumstudio.socketio.Configuration config = new com.corundumstudio.socketio.Configuration();
         config.setPort(port);
         config.setOrigin(null);
@@ -54,7 +55,14 @@ public class SocketIOConfig {
                 posData.put("carrera_id", raceId);
                 posData.put("positions", positions);
                 posData.put("elapsed", simulationService.getElapsed(raceId));
+                posData.put("estados", simulationService.getEstados(raceId));
+                posData.put("clima", simulationService.getClima(raceId));
                 client.sendEvent("race_positions", posData);
+
+                Map<String, Object> snapshot = new java.util.HashMap<>();
+                snapshot.put("carrera_id", raceId);
+                snapshot.put("eventos", simulationService.getEventos(raceId));
+                client.sendEvent("race_events_snapshot", snapshot);
             }
         });
 
@@ -77,7 +85,7 @@ public class SocketIOConfig {
         });
 
         server.start();
-        raceLifecycleManager.setSocketIOServer(server);
+        raceScheduler.setSocketIOServer(server);
         auctionScheduler.setSocketIOServer(server);
         auctionService.setSocketIOServer(server);
         log.info("[Socket.IO] Servidor iniciado en puerto {}", port);

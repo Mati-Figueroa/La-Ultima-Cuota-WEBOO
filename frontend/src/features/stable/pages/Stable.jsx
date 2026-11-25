@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Container, Row, Col, Card, Button, Badge, Modal, Form } from 'react-bootstrap';
 import { useToast } from '../../../shared/context/ToastContext';
+import HorseCondition, { LESION_LABELS } from '../../../shared/components/HorseCondition';
 import api from '../../../shared/services/api';
 
 const PAGE_SIZE = 10;
@@ -16,6 +17,21 @@ function Stable() {
   const [sellModal, setSellModal] = useState({ show: false, id: null, precio: '' });
   const [historyModal, setHistoryModal] = useState({ show: false, id: null, history: [] });
   const [deleteModal, setDeleteModal] = useState({ show: false, id: null, nombre: '' });
+  const [jockeyModal, setJockeyModal] = useState({ show: false, horse: null, jineteId: '' });
+  const [itemModal, setItemModal] = useState({ show: false, horse: null, itemId: '' });
+  const [misJinetes, setMisJinetes] = useState([]);
+  const [inventario, setInventario] = useState([]);
+  const [saving, setSaving] = useState(false);
+
+  const fetchExtras = useCallback(async () => {
+    try {
+      const [jRes, iRes] = await Promise.all([api.get('/api/jockeys/mine'), api.get('/api/inventory')]);
+      if (jRes.data.success) setMisJinetes(jRes.data.data.jinetes);
+      if (iRes.data.success) setInventario(iRes.data.data.inventario);
+    } catch {
+      /* el establo funciona aunque fallen los extras */
+    }
+  }, []);
 
   const fetchHorses = useCallback(async () => {
     try {
@@ -28,7 +44,57 @@ function Stable() {
     }
   }, [showToast]);
 
-  useEffect(() => { fetchHorses(); }, [fetchHorses]);
+  useEffect(() => { fetchHorses(); fetchExtras(); }, [fetchHorses, fetchExtras]);
+
+  const openJockeyModal = (horse) => {
+    setJockeyModal({ show: true, horse, jineteId: horse.jinete ? String(horse.jinete.id) : '' });
+  };
+
+  const handleAssignJockey = async () => {
+    const { horse, jineteId } = jockeyModal;
+    setSaving(true);
+    try {
+      let response;
+      if (jineteId) {
+        response = await api.patch(`/api/jockeys/${jineteId}/assign`, { caballoId: horse.id });
+      } else if (horse.jinete) {
+        response = await api.patch(`/api/jockeys/${horse.jinete.id}/assign`, { caballoId: null });
+      }
+      if (response) showToast(response.data.data.message, 'success');
+      setJockeyModal({ show: false, horse: null, jineteId: '' });
+      fetchHorses();
+      fetchExtras();
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Error al asignar el jinete', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUseItem = async () => {
+    const { horse, itemId } = itemModal;
+    if (!itemId) return;
+    setSaving(true);
+    try {
+      const response = await api.post(`/api/inventory/${itemId}/use`, { caballoId: horse.id });
+      showToast(response.data.data.message, 'success');
+      setItemModal({ show: false, horse: null, itemId: '' });
+      fetchHorses();
+      fetchExtras();
+    } catch (err) {
+      showToast(err.response?.data?.error || 'No se pudo usar el producto', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const describirItem = (it) => {
+    const efectos = [];
+    if (it.cura_nivel > 0) efectos.push(`cura hasta ${['', 'leve', 'moderada', 'grave'][it.cura_nivel]}`);
+    if (it.reduce_fatiga > 0) efectos.push(`-${it.reduce_fatiga} fatiga`);
+    if (it.aumenta_felicidad > 0) efectos.push(`+${it.aumenta_felicidad} felicidad`);
+    return efectos.join(', ');
+  };
 
   const handleRename = async () => {
     if (!renameModal.nombre.trim()) return;
@@ -127,8 +193,9 @@ function Stable() {
             color: 'var(--color-text-dark)',
           }}
         >
-          <strong>Tu establo:</strong> Aquí ves todos tus caballos. Puedes renombrarlos, ponerlos a la venta
-          o eliminarlos. Los caballos con fatiga alta no pueden competir hasta que se recuperen.
+          <strong>Tu establo:</strong> Aquí ves todos tus caballos. Puedes renombrarlos, ponerlos a la venta,
+          asignarles un jinete o darles productos de la <Link to="/tienda">tienda</Link>. Los caballos lesionados,
+          muy tristes o con fatiga alta no pueden competir hasta que se recuperen.
         </div>
       )}
 
@@ -185,9 +252,38 @@ function Stable() {
                           <span className="font-mono" style={{ fontSize: '0.8rem' }}>{horse.fatiga}%</span>
                         </div>
                       </div>
+                      <HorseCondition felicidad={horse.felicidad} lesion={horse.lesion} lesionHasta={horse.lesion_hasta} />
+                      <div className="d-flex justify-content-between mt-1">
+                        <span className="text-muted">Jinete</span>
+                        <span className="fw-semibold" data-testid="jinete-caballo">
+                          {horse.jinete ? (
+                            <Link to={`/jinete/${horse.jinete.id}`} className="text-decoration-none">
+                              <i className="bi bi-person-badge me-1"></i>{horse.jinete.nombre}
+                            </Link>
+                          ) : (
+                            <span className="text-muted fw-normal">Sin jinete</span>
+                          )}
+                        </span>
+                      </div>
                     </div>
 
                     <div className="mt-auto d-flex flex-wrap gap-1">
+                      <Button
+                        variant="outline-dark"
+                        size="sm"
+                        style={{ borderRadius: '6px', fontSize: '0.78rem' }}
+                        onClick={() => openJockeyModal(horse)}
+                      >
+                        <i className="bi bi-person-badge me-1"></i>Asignar jinete
+                      </Button>
+                      <Button
+                        variant="outline-success"
+                        size="sm"
+                        style={{ borderRadius: '6px', fontSize: '0.78rem' }}
+                        onClick={() => setItemModal({ show: true, horse, itemId: '' })}
+                      >
+                        <i className="bi bi-basket me-1"></i>Usar ítem
+                      </Button>
                       <Link
                         to={`/caballo/${horse.id}`}
                         className="btn btn-outline-primary btn-sm"
@@ -335,6 +431,97 @@ function Stable() {
             Cancelar
           </Button>
           <Button variant="danger" onClick={handleDelete}>Eliminar</Button>
+        </Modal.Footer>
+      </Modal>
+
+      <Modal show={jockeyModal.show} onHide={() => setJockeyModal({ show: false, horse: null, jineteId: '' })} centered>
+        <Modal.Header closeButton>
+          <Modal.Title className="font-heading fw-bold">Jinete de {jockeyModal.horse?.nombre}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {misJinetes.length === 0 ? (
+            <p className="text-muted mb-0">
+              Aún no tienes jinetes. Contrata uno en <Link to="/jinetes">Jinetes</Link>.
+            </p>
+          ) : (
+            <Form.Group>
+              <Form.Label>Elige uno de tus jinetes</Form.Label>
+              <Form.Select
+                data-testid="select-jinete"
+                value={jockeyModal.jineteId}
+                onChange={(e) => setJockeyModal({ ...jockeyModal, jineteId: e.target.value })}
+                style={{ borderRadius: '8px' }}
+              >
+                <option value="">Sin jinete</option>
+                {misJinetes.map((j) => (
+                  <option key={j.id} value={j.id}>
+                    {j.nombre} · habilidad {j.habilidad}
+                    {j.especialidad ? ` · experto en ${j.especialidad}` : ''}
+                    {j.caballo_nombre && j.caballo_id !== jockeyModal.horse?.id ? ` (monta a ${j.caballo_nombre})` : ''}
+                  </option>
+                ))}
+              </Form.Select>
+              <Form.Text className="text-muted">
+                Si el jinete ya monta otro caballo, se cambia a este. Un caballo tiene un solo jinete.
+              </Form.Text>
+            </Form.Group>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setJockeyModal({ show: false, horse: null, jineteId: '' })}>
+            Cancelar
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleAssignJockey}
+            disabled={saving || misJinetes.length === 0 || (!jockeyModal.jineteId && !jockeyModal.horse?.jinete)}
+          >
+            Guardar
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      <Modal show={itemModal.show} onHide={() => setItemModal({ show: false, horse: null, itemId: '' })} centered>
+        <Modal.Header closeButton>
+          <Modal.Title className="font-heading fw-bold">Cuidar a {itemModal.horse?.nombre}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {itemModal.horse && (
+            <p className="text-muted" style={{ fontSize: '0.85rem' }}>
+              Fatiga {itemModal.horse.fatiga}% · Felicidad {itemModal.horse.felicidad} ·{' '}
+              {itemModal.horse.lesion ? LESION_LABELS[itemModal.horse.lesion] : 'Sano'}
+            </p>
+          )}
+          {inventario.length === 0 ? (
+            <p className="text-muted mb-0">
+              Tu inventario está vacío. Compra comida y curaciones en la <Link to="/tienda">Tienda</Link>.
+            </p>
+          ) : (
+            <Form.Group>
+              <Form.Label>Producto</Form.Label>
+              <Form.Select
+                data-testid="select-item"
+                value={itemModal.itemId}
+                onChange={(e) => setItemModal({ ...itemModal, itemId: e.target.value })}
+                style={{ borderRadius: '8px' }}
+              >
+                <option value="">Elige un producto…</option>
+                {inventario.map((it) => (
+                  <option key={it.item_id} value={it.item_id}>
+                    {it.nombre} ×{it.cantidad} — {describirItem(it)}
+                  </option>
+                ))}
+              </Form.Select>
+            </Form.Group>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setItemModal({ show: false, horse: null, itemId: '' })}>
+            Cancelar
+          </Button>
+          <Button variant="success" onClick={handleUseItem} disabled={saving || !itemModal.itemId}>
+            Usar
+          </Button>
         </Modal.Footer>
       </Modal>
 

@@ -1,20 +1,24 @@
 import React from 'react';
+import { ESTADO_ICON, ESTADO_LABEL, fondoPista } from './RaceEvents';
 
 const LANE_HEIGHT = 44;
 const FINISH_PX = 760;
 const LANE_COLORS = ['#15BD0F', '#0d6efd', '#fd7e14', '#dc3545', '#6f42c1', '#20c997', '#e83e8c', '#ffc107', '#17a2b8', '#343a40', '#007bff', '#28a745'];
 
-function RaceTrack({ inscriptions = [], positions = {}, rankings = {} }) {
+function RaceTrack({ inscriptions = [], positions = {}, rankings = {}, estados = {}, clima = null }) {
   const trackHeight = inscriptions.length * LANE_HEIGHT + 16;
 
   return (
     <div style={{ width: '100%', overflowX: 'auto' }}>
       <div
+        data-testid="pista"
+        data-clima={clima || ''}
         style={{
           minWidth: '600px',
           maxWidth: '820px',
           height: `${trackHeight}px`,
-          backgroundColor: '#f5f0e8',
+          background: fondoPista(clima),
+          transition: 'background 1s ease',
           borderRadius: '10px',
           position: 'relative',
           overflow: 'hidden',
@@ -67,9 +71,14 @@ function RaceTrack({ inscriptions = [], positions = {}, rankings = {} }) {
           const laneTop = idx * LANE_HEIGHT + 8 + (LANE_HEIGHT - 28) / 2;
           const color = LANE_COLORS[idx % LANE_COLORS.length];
           const finished = pos >= FINISH_PX;
+          const estado = estados[insc.caballo_id];
+          const fuera = estado === 'abducido' || estado === 'colapso';
           return (
             <div
               key={insc.caballo_id || idx}
+              data-testid="caballo-pista"
+              data-estado={estado || ''}
+              title={estado ? ESTADO_LABEL[estado] : undefined}
               style={{
                 position: 'absolute',
                 left: `${pos}px`,
@@ -77,10 +86,17 @@ function RaceTrack({ inscriptions = [], positions = {}, rankings = {} }) {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                transition: 'left 1s linear',
+                transition: 'left 1s linear, opacity 0.8s ease',
+                opacity: estado === 'abducido' ? 0.25 : fuera ? 0.55 : 1,
+                filter: estado === 'colapso' ? 'grayscale(1)' : 'none',
                 zIndex: 2,
               }}
             >
+              {estado && (
+                <span style={{ fontSize: '1rem', lineHeight: 1 }} aria-label={ESTADO_LABEL[estado]}>
+                  {ESTADO_ICON[estado]}
+                </span>
+              )}
               {rank && (
                 <span
                   style={{

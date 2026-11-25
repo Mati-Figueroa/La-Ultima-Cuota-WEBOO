@@ -9,6 +9,8 @@ const SIDEBAR_ITEMS = [
   { path: '/subastas', label: 'Subastas', icon: 'bi-hammer' },
   { path: '/calendario', label: 'Carreras', icon: 'bi-flag' },
   { path: '/gacha', label: 'Gacha', icon: 'bi-dice-5' },
+  { path: '/tienda', label: 'Tienda', icon: 'bi-bag' },
+  { path: '/jinetes', label: 'Jinetes', icon: 'bi-person-badge' },
   { path: '/historial', label: 'Historial', icon: 'bi-clock-history' },
   { path: '/usuarios', label: 'Usuarios', icon: 'bi-people' },
   { path: '/simulador', label: 'Simulador', icon: 'bi-play-circle' },

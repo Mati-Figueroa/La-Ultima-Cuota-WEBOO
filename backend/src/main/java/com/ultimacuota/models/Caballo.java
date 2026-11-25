@@ -60,6 +60,15 @@ public class Caballo {
     @Column(name = "es_bot")
     private Boolean esBot = false;
 
+    @Builder.Default
+    private Integer felicidad = 70;
+
+    @Column(length = 20)
+    private String lesion;
+
+    @Column(name = "lesion_hasta")
+    private LocalDateTime lesionHasta;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

@@ -1,6 +1,9 @@
 package com.ultimacuota.scheduler;
 
+import com.ultimacuota.models.EventoCarrera;
+import com.ultimacuota.repositories.CaballoRepository;
 import com.ultimacuota.repositories.CarreraRepository;
+import com.ultimacuota.repositories.EventoCarreraRepository;
 import com.ultimacuota.services.RaceSimulationService;
 import com.corundumstudio.socketio.SocketIOServer;
 import jakarta.transaction.Transactional;
@@ -22,6 +25,8 @@ public class RaceScheduler {
     private final RaceSimulationService simulationService;
     private final RaceCreator raceCreator;
     private final RaceLifecycleManager raceLifecycleManager;
+    private final EventoCarreraRepository eventoCarreraRepository;
+    private final CaballoRepository caballoRepository;
 
     private SocketIOServer socketIOServer;
 
@@ -42,12 +47,26 @@ public class RaceScheduler {
             RaceSimulationService.TickResult tick = simulationService.tickSimulation(raceId);
             if (tick == null) continue;
 
+            if (tick.eventos != null) {
+                for (Map<String, Object> evento : tick.eventos) {
+                    registrarEvento(raceId, evento);
+                    if (socketIOServer != null) {
+                        Map<String, Object> evData = new HashMap<>(evento);
+                        evData.put("carrera_id", raceId);
+                        // Solo broadcast: también llega a la sala y así nadie lo recibe dos veces.
+                        socketIOServer.getBroadcastOperations().sendEvent("race_event", evData);
+                    }
+                }
+            }
+
             if (tick.positions != null && socketIOServer != null) {
                 Map<String, Object> data = new HashMap<>();
                 data.put("carrera_id", raceId);
                 data.put("positions", tick.positions);
                 data.put("rankings", tick.rankings);
                 data.put("elapsed", tick.elapsed);
+                data.put("estados", tick.estados);
+                data.put("clima", tick.clima);
                 socketIOServer.getRoomOperations("race_" + raceId).sendEvent("race_positions", data);
                 socketIOServer.getBroadcastOperations().sendEvent("race_positions", data);
             }
@@ -63,6 +82,23 @@ public class RaceScheduler {
                     socketIOServer.getBroadcastOperations().sendEvent("race_finished", finishData);
                 }
             }
+        }
+    }
+
+    private void registrarEvento(Long raceId, Map<String, Object> evento) {
+        try {
+            Object caballoId = evento.get("caballo_id");
+            EventoCarrera registro = EventoCarrera.builder()
+                    .carrera(carreraRepository.getReferenceById(raceId))
+                    .tipo((String) evento.get("tipo"))
+                    .caballo(caballoId instanceof Long id ? caballoRepository.getReferenceById(id) : null)
+                    .segundo(evento.get("segundo") instanceof Number n ? n.intValue() : 0)
+                    .descripcion((String) evento.get("descripcion"))
+                    .build();
+            eventoCarreraRepository.save(registro);
+            log.info("[Eventos] Carrera #{}: {}", raceId, evento.get("descripcion"));
+        } catch (Exception e) {
+            log.error("[Eventos] No se pudo registrar el evento de la carrera #{}: {}", raceId, e.getMessage());
         }
     }
 
