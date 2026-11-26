@@ -44,7 +44,7 @@ function HorseDetail() {
 
   const getWinrate = () => {
     if (!horse.carreras_totales || horse.carreras_totales === 0) return '0%';
-    return `${((horse.victorias / horse.carreras_totales) * 100).toFixed(0)}%`;
+    return `${(((horse.victorias ?? 0) / horse.carreras_totales) * 100).toFixed(0)}%`;
   };
 
   return (
@@ -83,7 +83,7 @@ function HorseDetail() {
                     <span className="font-mono fw-bold text-success">{getWinrate()}</span>
                   </div>
                   <ProgressBar
-                    now={horse.carreras_totales > 0 ? (horse.victorias / horse.carreras_totales) * 100 : 0}
+                    now={horse.carreras_totales > 0 ? ((horse.victorias ?? 0) / horse.carreras_totales) * 100 : 0}
                     variant="success"
                     style={{ height: '8px' }}
                   />

@@ -23,10 +23,6 @@ public interface CarreraRepository extends JpaRepository<Carrera, Long> {
     List<Carrera> findRunningWithStartTime();
 
     @Modifying
-    @Query("DELETE FROM Carrera c WHERE c.estado = 'programada' AND c.tieneInteraccionHumana = false AND c.fechaProgramada < :now")
-    int deleteExpiredBotOnlyRaces(@Param("now") LocalDateTime now);
-
-    @Modifying
     @Query("DELETE FROM Carrera c WHERE c.estado = 'programada' AND c.tieneInteraccionHumana = false")
     int deleteAllBotOnlyProgrammedRaces();
 

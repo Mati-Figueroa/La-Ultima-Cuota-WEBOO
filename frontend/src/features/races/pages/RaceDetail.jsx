@@ -235,7 +235,7 @@ function RaceDetail() {
                     <tbody>
                       {race.inscripciones.map((insc) => {
                         const wr = insc.carreras_totales > 0
-                          ? ((insc.victorias / insc.carreras_totales) * 100).toFixed(0)
+                          ? (((insc.victorias ?? 0) / insc.carreras_totales) * 100).toFixed(0)
                           : '0';
                         const result = results.find((r) => r.caballo_id === insc.caballo_id);
                         return (

@@ -53,8 +53,6 @@ public class RaceLifecycleManager {
         try {
             LocalDateTime now = LocalDateTime.now();
 
-            carreraRepository.deleteExpiredBotOnlyRaces(now);
-
             List<Carrera> toStart = carreraRepository.findToTransition("programada", now);
             for (Carrera race : toStart) {
                 race.setEstado("en_curso");
@@ -135,14 +133,13 @@ public class RaceLifecycleManager {
                 resultadoRepository.save(resultado);
             }
 
-            if (!race.getTieneInteraccionHumana()) {
-                carreraRepository.delete(race);
-                log.info("[Lifecycle] Carrera #{} eliminada (solo bots)", raceId);
-                return;
+            // Las carreras de solo bots también se conservan (se pueden ver en vivo y después),
+            // pero no alteran las estadísticas ni la fatiga de los bots, que no tienen cómo recuperarla.
+            boolean conHumanos = Boolean.TRUE.equals(race.getTieneInteraccionHumana());
+            betSettlementService.settleRace(raceId, results, conHumanos);
+            if (conHumanos) {
+                horseConditionService.aplicarResultadoCarrera(results);
             }
-
-            betSettlementService.settleRace(raceId, results);
-            horseConditionService.aplicarResultadoCarrera(results);
 
             race.setEstado("finalizada");
             race.setFechaFinReal(LocalDateTime.now());

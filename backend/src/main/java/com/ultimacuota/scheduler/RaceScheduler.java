@@ -143,7 +143,8 @@ public class RaceScheduler {
 
             int toCreate = 4 - programmed.size();
             for (int i = 0; i < toCreate; i++) {
-                LocalDateTime nextSlot = getNextClockSlot(lastTime, lastTime.equals(now) ? i : i + 1);
+                // lastTime avanza en cada vuelta, así que siempre se pide el siguiente horario (índice 0).
+                LocalDateTime nextSlot = getNextClockSlot(lastTime, 0);
                 raceCreator.createRaceAt(nextSlot);
                 lastTime = nextSlot;
             }

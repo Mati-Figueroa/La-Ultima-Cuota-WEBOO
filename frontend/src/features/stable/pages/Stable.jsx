@@ -156,7 +156,7 @@ function Stable() {
 
   const getWinrate = (h) => {
     if (!h.carreras_totales || h.carreras_totales === 0) return '0%';
-    return `${((h.victorias / h.carreras_totales) * 100).toFixed(0)}%`;
+    return `${(((h.victorias ?? 0) / h.carreras_totales) * 100).toFixed(0)}%`;
   };
 
   const totalPages = Math.max(1, Math.ceil(horses.length / PAGE_SIZE));

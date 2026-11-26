@@ -25,7 +25,7 @@ public class BetSettlementService {
     private final InscripcionRepository inscripcionRepository;
 
     @Transactional
-    public void settleRace(Long raceId, List<Map<String, Object>> results) {
+    public void settleRace(Long raceId, List<Map<String, Object>> results, boolean actualizarEstadisticas) {
         Long winnerHorseId = (Long) results.get(0).get("caballo_id");
         List<Apuesta> pendingBets = apuestaRepository.findPendingBetsWithCarrera(raceId);
 
@@ -103,6 +103,8 @@ public class BetSettlementService {
                 transaccionRepository.save(tx);
             }
         }
+
+        if (!actualizarEstadisticas) return;
 
         for (Map<String, Object> r : results) {
             Long caballoId = (Long) r.get("caballo_id");

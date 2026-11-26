@@ -283,6 +283,7 @@ public class RaceService {
         map.put("jinete_nombre", Boolean.TRUE.equals(i.getCaballo().getEsBot()) ? null
                 : jineteRepository.findValidoPorCaballo(i.getCaballo().getId()).map(Jinete::getNombre).orElse(null));
         map.put("carreras_totales", i.getCaballo().getCarrerasTotales());
+        map.put("victorias", i.getCaballo().getVictorias());
         map.put("es_bot", i.getCaballo().getEsBot());
         map.put("numero_carril", i.getNumeroCarril());
         map.put("fecha_inscripcion", i.getFechaInscripcion());
